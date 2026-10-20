@@ -1,0 +1,37 @@
+# The full stack's one edge (pacod-caddy): plain HTTP on one port, every UI and API a host name
+# under DEMO_DOMAIN. The site blocks are the products' own: each repository ships them in
+# platform/caddy/<product>.caddy, mounted into /etc/caddy/sites/ (compose's platform.yml), and
+# reads its address from a *_SITE variable that scripts/render-env.sh sets, e.g.
+# AP_SITE=http://app.localhost:8800. Only the platform's own sites are written here.
+{
+	# Plain HTTP: a local demo has no certificates to obtain.
+	auto_https off
+	http_port {$DEMO_HTTP_PORT}
+	admin 0.0.0.0:2019
+	servers {
+		# Per-host request metrics for Prometheus (job "caddy", scraped on :9180 below).
+		metrics
+	}
+}
+
+import /etc/caddy/sites/*.caddy
+
+# Grafana: the dashboards of every product, anonymous read-only.
+http://grafana.{$DEMO_DOMAIN}:{$DEMO_HTTP_PORT} {
+	reverse_proxy pacod-grafana:3000
+}
+
+# The mail sink: every mail the stack sends (invitations, confirmations) ends here.
+http://mail.{$DEMO_DOMAIN}:{$DEMO_HTTP_PORT} {
+	reverse_proxy pacod-mailpit:8025
+}
+
+# Prometheus, for ad-hoc queries.
+http://prometheus.{$DEMO_DOMAIN}:{$DEMO_HTTP_PORT} {
+	reverse_proxy pacod-prometheus:9090
+}
+
+# Caddy's own metrics, reachable on pacod-net only (not published).
+:9180 {
+	metrics /metrics
+}

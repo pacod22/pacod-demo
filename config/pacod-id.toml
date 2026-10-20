@@ -1,0 +1,133 @@
+# pacod-id for the full stack: one realm, `pacod`, for every product. One sign-in covers the app
+# (pacod-ap), the gateway console (pacod-gw), the CMS studio (pacod-cms) and the knowledge base
+# (pacod-kb). The clients are the products' own, as their standalone configurations define them:
+#
+#   pacod-ap   pacod-api/docker/pacod-id/pacod-id.toml   pacod-web, pacod-api, the gateway's three
+#   pacod-cms  docker/pacod-id/pacod-id.toml             pacod-cms-studio, pacod-cms-service
+#   pacod-kb   docker/pacod-id/pacod-id.toml             pacod-kb-ui, pacod-kb-service
+#
+# ${NAME} is filled in from pacod-id's environment (.state/env/id.env, made by
+# scripts/render-env.sh from demo.env); secrets come from the variable each `secret_env` names.
+
+[[realm]]
+name = "pacod"
+issuer = "${PACOD_ID_ISSUER}"
+# One of pacod-id's built-in brands; a realm has one look for every product in it.
+brand = "gateway"
+locales = ["en", "bg", "de", "ru"]
+default_locale = "en"
+mail_locales = ["en", "bg"]
+# Accounts come from the bootstrap admin and by invitation; nobody signs up on a demo.
+self_signup = false
+terms_url = "${AP_ORIGIN}/terms"
+terms_version = "2026-10-16"
+privacy_url = "${AP_ORIGIN}/privacy"
+# Who creates, disables and resets accounts besides id.admin.
+accounts_managed_by = ["pacod.admin", "pacod.superuser", "gw.platform_admin", "cms.platform_admin", "kb.admin"]
+
+# ---- pacod-ap -------------------------------------------------------------------------------
+
+# The app's SvelteKit server: a BFF that keeps the tokens (aud pacod-api).
+[[client]]
+id = "pacod-web"
+realm = "pacod"
+kind = "confidential"
+secret_env = "PACOD_WEB_CLIENT_SECRET"
+redirect_uris = ["${AP_ORIGIN}/auth/callback"]
+post_logout_redirect_uris = ["${AP_ORIGIN}/"]
+backchannel_logout_uri = "http://ap-frontend:3000/auth/backchannel-logout"
+initiate_login_uri = "${AP_ORIGIN}/auth/login"
+audience = "pacod-api"
+access_ttl_seconds = 300
+
+# The app's API and admin API: the `pacod` catalogue, the feed, introspection, token exchange.
+[[client]]
+id = "pacod-api"
+realm = "pacod"
+kind = "service"
+product = "pacod"
+secret_env = "PACOD_API_CLIENT_SECRET"
+audience = "pacod-api"
+
+# ---- pacod-gw -------------------------------------------------------------------------------
+
+# The gateway console.
+[[client]]
+id = "pacod-gw-console"
+realm = "pacod"
+kind = "confidential"
+secret_env = "PGW_UI_CLIENT_SECRET"
+redirect_uris = ["${GW_CONSOLE_ORIGIN}/auth/callback"]
+post_logout_redirect_uris = ["${GW_CONSOLE_ORIGIN}/"]
+initiate_login_uri = "${GW_CONSOLE_ORIGIN}/auth/login"
+audience = "pacod-gw"
+
+# The gateway core: the `gw` catalogue, organisations and workspaces, the feed, token exchange.
+[[client]]
+id = "pacod-gw-core"
+realm = "pacod"
+kind = "service"
+product = "gw"
+secret_env = "PGW_ID_CLIENT_SECRET"
+audience = "pacod-gw"
+
+# The gateway tester.
+[[client]]
+id = "pacod-gw-tester"
+realm = "pacod"
+kind = "service"
+secret_env = "TESTER_ID_CLIENT_SECRET"
+audience = "pacod-gw"
+
+# The demo's bootstrap (scripts/bootstrap.py, through pacod-ap's gw_bootstrap.py) signs in by the
+# code flow without a browser to mint the gateway's admin token; nothing listens at its redirect.
+[[client]]
+id = "gw-smoke"
+realm = "pacod"
+kind = "public"
+redirect_uris = ["http://127.0.0.1:13999/callback"]
+audience = "pacod-gw"
+
+# ---- pacod-cms ------------------------------------------------------------------------------
+
+# The studio's sign-in (authorization code with PKCE; exact redirect URIs).
+[[client]]
+id = "pacod-cms-studio"
+realm = "pacod"
+kind = "confidential"
+secret_env = "CMS_ID_STUDIO_SECRET"
+redirect_uris = ["${CMS_STUDIO_ORIGIN}/mgmt/oauth2/code/pacod-id"]
+post_logout_redirect_uris = ["${CMS_STUDIO_ORIGIN}/mgmt/login?loggedOut"]
+initiate_login_uri = "${CMS_STUDIO_ORIGIN}/mgmt/login"
+audience = "pacod-cms"
+
+# The studio as a service: the cms catalogue, organisations and websites as scopes, the feed.
+[[client]]
+id = "pacod-cms-service"
+realm = "pacod"
+kind = "service"
+product = "cms"
+secret_env = "CMS_ID_SERVICE_SECRET"
+audience = "pacod-cms"
+
+# ---- pacod-kb -------------------------------------------------------------------------------
+
+# The UI's sign-in.
+[[client]]
+id = "pacod-kb-ui"
+realm = "pacod"
+kind = "confidential"
+secret_env = "KB_ID_UI_SECRET"
+redirect_uris = ["${KB_ORIGIN}/kb/auth/callback"]
+post_logout_redirect_uris = ["${KB_ORIGIN}/kb/login?signed_out=1"]
+initiate_login_uri = "${KB_ORIGIN}/kb/login"
+audience = "pacod-kb"
+
+# The UI as a service: the kb catalogue, the feed, the members page's admin API.
+[[client]]
+id = "pacod-kb-service"
+realm = "pacod"
+kind = "service"
+product = "kb"
+secret_env = "KB_ID_SERVICE_SECRET"
+audience = "pacod-kb"

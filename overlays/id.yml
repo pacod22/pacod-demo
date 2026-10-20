@@ -1,0 +1,19 @@
+# Adapts pacod-id's app file (../pacod-id/deploy/compose/docker-compose.yml) to the full stack:
+# the demo's realm (config/pacod-id.toml) with every product's clients, the demo's secrets
+# instead of pacod-id's development .env, and no published ports (the edge serves the issuer).
+services:
+  pacod-id:
+    ports: !reset []
+    env_file: !override
+      - ${DEMO_STATE}/env/id.container.env
+    volumes: !override
+      - ${DEMO_HOME}/config/pacod-id.toml:/etc/pacod-id/pacod-id.toml:ro
+    environment:
+      PID_TRUSTED_PROXIES: private_ranges
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck", "http://127.0.0.1:9170/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 2s

@@ -1,0 +1,51 @@
+# The pacod full stack on one machine: one compose project made of the five repositories' own
+# compose files (their "app files"), a small overlay per repository, and the shared layer
+# (platform.yml). Run it with `make up`, not by hand: the Makefile generates the secrets and the
+# env files under .state/ that every include below reads.
+#
+# Every container is on the external network pacod-net and has a name that is unique across
+# the repositories (docs/NETWORK.md), which is what lets these files be put together unchanged.
+name: pacod-demo
+
+include:
+  # pacod-id: identity, one realm for every product (config/pacod-id.toml).
+  - path:
+      - ../pacod-id/deploy/compose/docker-compose.yml
+      - overlays/id.yml
+    env_file: [.state/env/stack.env, .state/env/id.env]
+
+  # pacod-gw: the gateway (core, analytics, console, tester, ClickHouse) and its mock provider.
+  - path:
+      - ../pacod-gw/deploy/docker-compose.yml
+      - ../pacod-gw/deploy/docker-compose.dev.yml
+      - overlays/gw.yml
+    env_file: [.state/env/stack.env, .state/env/gw.env]
+
+  # pacod-ap: the agent platform (API, admin API, workers, frontend) and the shared embeddings.
+  - path:
+      - ../pacod-ap/pacod-api/docker-compose.yml
+      - ../pacod-ap/pacod-api/docker-compose.local.yml
+      - overlays/ap.yml
+    env_file: [.state/env/stack.env, .state/env/ap.env]
+
+  # The exporters pacod-ap ships with its monitoring: the platform's and the app's.
+  - path:
+      - ../pacod-ap/monitoring/docker-compose.exporters.yml
+      - overlays/exporters.yml
+    env_file: [.state/env/stack.env, .state/env/ap.env]
+
+  # pacod-cms: the websites, the studio, MongoDB and the PDF renderer.
+  - path:
+      - ../pacod-cms/docker-compose.yml
+      - overlays/cms.yml
+    env_file: [.state/env/stack.env, .state/env/cms.env]
+
+  # pacod-kb: the knowledge base's pipeline and UI.
+  - path:
+      - ../pacod-kb/docker-compose.yml
+      - overlays/kb.yml
+    env_file: [.state/env/stack.env, .state/env/kb.env]
+
+  # The shared layer: one PostgreSQL, Qdrant, mail sink, edge and monitoring stack.
+  - path: platform.yml
+    env_file: [.state/env/stack.env]

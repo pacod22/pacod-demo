@@ -1,0 +1,14 @@
+# Adapts pacod-ap's exporters (../pacod-ap/monitoring/docker-compose.exporters.yml) to the full
+# stack: the platform's (PostgreSQL, the host, the containers) and the app's (pgbouncer, Redis),
+# all scraped by the one pacod-prometheus, none published.
+services:
+  pacod-postgres-exporter:
+    ports: !reset []
+  ap-pgbouncer-exporter:
+    ports: !reset []
+  ap-redis-exporter:
+    ports: !reset []
+  pacod-node-exporter:
+    ports: !reset []
+  pacod-cadvisor:
+    ports: !reset []

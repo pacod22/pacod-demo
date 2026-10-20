@@ -1,0 +1,12 @@
+# Adapts pacod-kb's app file (../pacod-kb/docker-compose.yml) to the full stack: the shared
+# PostgreSQL, Qdrant, embeddings service, pacod-id and gateway (their addresses and the kb
+# settings come from .state/env/kb.env), named volumes instead of /data paths, and no
+# published ports (the edge serves the UI).
+services:
+  kb-pipeline:
+    depends_on:
+      pacod-embeddings:
+        condition: service_healthy
+
+  kb-ui:
+    ports: !reset []

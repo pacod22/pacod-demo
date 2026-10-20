@@ -1,0 +1,50 @@
+# Adapts pacod-ap's app file and its laptop overlay (../pacod-ap/pacod-api/docker-compose.yml,
+# docker-compose.local.yml: CPU-only torch, log volumes instead of /data paths) to the full stack:
+# the demo's container settings (.state/env/ap.container.env, built from the app's own
+# .env.example) instead of the checkout's .env, the shared embeddings service on the shared model
+# cache, and no published ports (the edge serves the app).
+services:
+  ap-api:
+    env_file: !override
+      - ${DEMO_STATE}/env/ap.container.env
+    ports: !reset []
+  ap-admin-api:
+    env_file: !override
+      - ${DEMO_STATE}/env/ap.container.env
+    ports: !reset []
+  ap-ingestion:
+    env_file: !override
+      - ${DEMO_STATE}/env/ap.container.env
+  ap-ingestion-cpu:
+    env_file: !override
+      - ${DEMO_STATE}/env/ap.container.env
+  ap-improvement-loop:
+    env_file: !override
+      - ${DEMO_STATE}/env/ap.container.env
+  ap-improvement-loop-worker:
+    env_file: !override
+      - ${DEMO_STATE}/env/ap.container.env
+  ap-newsletter-worker:
+    env_file: !override
+      - ${DEMO_STATE}/env/ap.container.env
+  ap-mcp:
+    env_file: !override
+      - ${DEMO_STATE}/env/ap.container.env
+  ap-adminer:
+    ports: !reset []
+
+  # Shared: the app and the knowledge base (pacod-kb's EMBEDDINGS_URL) embed with it.
+  pacod-embeddings:
+    environment:
+      EMBEDDINGS_BACKEND: ${EMBEDDINGS_BACKEND}
+      TORCH_NUM_THREADS: ${TORCH_NUM_THREADS}
+    volumes: !override
+      - pacod-hf-cache:/root/.cache/huggingface
+    # The first start downloads bge-m3 and its reranker (about 4 GB) into the shared cache.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 1800s
+      start_interval: 5s

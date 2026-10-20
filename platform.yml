@@ -1,0 +1,183 @@
+# The shared layer of the full stack: one of each component that more than one product uses
+# (pacod-demo/docs/NETWORK.md). Nothing here is written from scratch: every service `extends` the
+# definition a repository already ships in its standalone file (image, health check, limits,
+# settings), and this file changes only what one shared instance needs to differ in:
+#
+#   - no depends_on, profiles or ports of the standalone stack (only pacod-caddy publishes, the
+#     demo's one port);
+#   - the configuration each product contributes from its platform/ directory, mounted together:
+#     every product's Caddy site blocks, database script, scrape jobs, rules and dashboards.
+#
+# pacod-id, pacod-gw (with gw-mock) and pacod-embeddings are shared too; they are products' own
+# services and come with their app files (compose.yml).
+
+services:
+  # ---- PostgreSQL: one server, one database and owner role per product --------------------------
+  pacod-postgres:
+    extends:
+      file: ../pacod-gw/deploy/docker-compose.standalone.yml
+      service: pacod-postgres
+    depends_on: !reset {}
+    environment:
+      # A plain superuser; the products connect as their own non-superuser roles.
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${PG_SUPERUSER_PASSWORD}
+
+  # Runs every product's platform/postgres/*-db.sh at every start (idempotent), then stops.
+  pacod-db-init:
+    extends:
+      file: ../pacod-gw/deploy/docker-compose.standalone.yml
+      service: pacod-db-init
+    depends_on: !override
+      pacod-postgres:
+        condition: service_healthy
+    entrypoint: ["sh", "-c", "set -e; for f in /initdb.d/*/*-db.sh; do sh \"$$f\"; done"]
+    environment:
+      PGUSER: postgres
+      PGPASSWORD: ${PG_SUPERUSER_PASSWORD}
+      PID_DB_PASSWORD: ${PID_DB_PASSWORD}
+      GW_DB_PASSWORD: ${GW_DB_PASSWORD}
+      AP_DB_PASSWORD: ${AP_DB_PASSWORD}
+      KB_DATABASE_PASSWORD: ${KB_DATABASE_PASSWORD}
+    volumes: !override
+      - ../pacod-id/platform/postgres:/initdb.d/id:ro
+      - ../pacod-gw/platform/postgres:/initdb.d/gw:ro
+      # ap's directory also holds its copy of pacod-id's script, for ap's own stack: take its own.
+      - ../pacod-ap/platform/postgres/ap-db.sh:/initdb.d/ap/ap-db.sh:ro
+      - ../pacod-kb/platform/postgres:/initdb.d/kb:ro
+
+  # ---- Vectors: one Qdrant; the app's collections are pacod_*, the knowledge base's kb_* --------
+  pacod-qdrant:
+    extends:
+      file: ../pacod-kb/docker-compose.standalone.yml
+      service: pacod-qdrant
+    profiles: !reset []
+    ports: !reset []
+    volumes: !override
+      - pacod-qdrant-data:/qdrant/storage
+
+  # ---- Mail: every mail the stack sends ends here (http://mail.<domain>:<port>) -----------------
+  pacod-mailpit:
+    extends:
+      file: ../pacod-gw/deploy/docker-compose.standalone.dev.yml
+      service: pacod-mailpit
+    ports: !reset []
+
+  # ---- The edge: the only published port ----------------------------------------------------------
+  pacod-caddy:
+    extends:
+      file: ../pacod-gw/deploy/docker-compose.standalone.yml
+      service: pacod-caddy
+    depends_on: !reset {}
+    ports: !override
+      - "${DEMO_BIND}:${DEMO_HTTP_PORT}:${DEMO_HTTP_PORT}"
+    environment: !override
+      DEMO_DOMAIN: ${DEMO_DOMAIN}
+      DEMO_HTTP_PORT: ${DEMO_HTTP_PORT}
+      ID_SITE: ${ID_SITE}
+      AP_SITE: ${AP_SITE}
+      GW_CONSOLE_SITE: ${GW_CONSOLE_SITE}
+      GW_API_SITE: ${GW_API_SITE}
+      GW_SITE_TLS: ""
+      PGW_HSTS: max-age=0
+      PGW_ADMIN_ALLOW_CIDRS: 0.0.0.0/0
+      CMS_STUDIO_SITE: ${CMS_STUDIO_SITE}
+      CMS_PUBLIC_SITE: ${CMS_PUBLIC_SITE}
+      KB_SITE: ${KB_SITE}
+    volumes: !override
+      - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../pacod-id/platform/caddy/id.caddy:/etc/caddy/sites/id.caddy:ro
+      - ../pacod-gw/platform/caddy/gw.caddy:/etc/caddy/sites/gw.caddy:ro
+      - ../pacod-ap/platform/caddy/ap.caddy:/etc/caddy/sites/ap.caddy:ro
+      - ../pacod-cms/platform/caddy/cms.caddy:/etc/caddy/sites/cms.caddy:ro
+      - ../pacod-kb/platform/caddy/kb.caddy:/etc/caddy/sites/kb.caddy:ro
+      - pacod-caddy-data:/data
+      - pacod-caddy-config:/config
+    # The public names also resolve inside pacod-net, to the edge: a container reaches the issuer
+    # (and every other public address) the way a browser does.
+    networks: !override
+      pacod-net:
+        aliases:
+          - id.${DEMO_DOMAIN}
+          - app.${DEMO_DOMAIN}
+          - console.${DEMO_DOMAIN}
+          - gw.${DEMO_DOMAIN}
+          - studio.${DEMO_DOMAIN}
+          - demo.${DEMO_DOMAIN}
+          - minimal.${DEMO_DOMAIN}
+          - kb.${DEMO_DOMAIN}
+          - grafana.${DEMO_DOMAIN}
+          - mail.${DEMO_DOMAIN}
+          - prometheus.${DEMO_DOMAIN}
+
+  # ---- Monitoring: one Prometheus, Alertmanager, Grafana and trace collector ------------------------
+  pacod-otel:
+    extends:
+      file: ../pacod-gw/deploy/docker-compose.standalone.yml
+      service: pacod-otel
+
+  pacod-prometheus:
+    extends:
+      file: ../pacod-gw/deploy/docker-compose.standalone.yml
+      service: pacod-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=2GB
+    volumes: !override
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../pacod-gw/deploy/prometheus/rules:/etc/prometheus/rules/gw:ro
+      # The app's own rules; its gw.rules.yml is a vendored copy of the gateway's, mounted above.
+      - ../pacod-ap/monitoring/prometheus/alerts/app.rules.yml:/etc/prometheus/rules/ap/app.rules.yml:ro
+      - ../pacod-ap/monitoring/prometheus/alerts/infra.rules.yml:/etc/prometheus/rules/ap/infra.rules.yml:ro
+      - ../pacod-ap/monitoring/prometheus/alerts/web.rules.yml:/etc/prometheus/rules/ap/web.rules.yml:ro
+      - ../pacod-id/platform/prometheus/id.yml:/etc/prometheus/scrape.d/id.yml:ro
+      - ../pacod-gw/platform/prometheus/gw.yml:/etc/prometheus/scrape.d/gw.yml:ro
+      - ../pacod-ap/platform/prometheus/ap.yml:/etc/prometheus/scrape.d/ap.yml:ro
+      - pacod-prometheus-data:/prometheus
+
+  pacod-alertmanager:
+    extends:
+      file: ../pacod-gw/deploy/docker-compose.standalone.yml
+      service: pacod-alertmanager
+
+  pacod-grafana:
+    extends:
+      file: ../pacod-gw/deploy/docker-compose.standalone.yml
+      service: pacod-grafana
+    depends_on: !override
+      pacod-prometheus:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ORIGIN}/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      # Anyone who reaches the demo may look; changing needs the admin (GRAFANA_ADMIN_PASSWORD).
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/gw/overview.json
+    volumes: !override
+      - ../pacod-gw/deploy/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../pacod-gw/deploy/grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+      - ../pacod-gw/deploy/grafana/provisioning/plugins:/etc/grafana/provisioning/plugins:ro
+      - ./config/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/demo.yml:ro
+      - ../pacod-gw/deploy/grafana/dashboards:/etc/grafana/dashboards/gw:ro
+      - ../pacod-ap/monitoring/grafana/dashboards:/etc/grafana/dashboards/ap:ro
+      - pacod-grafana-data:/var/lib/grafana
+
+networks:
+  pacod-net:
+    external: true
+
+volumes:
+  pacod-postgres-data:
+  pacod-qdrant-data:
+  pacod-caddy-data:
+  pacod-caddy-config:
+  pacod-prometheus-data:
+  pacod-alertmanager-data:
+  pacod-grafana-data:
+  # The models of the shared embeddings service; the knowledge base reads the tokenizer from it.
+  pacod-hf-cache:

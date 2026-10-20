@@ -1,0 +1,28 @@
+# The full stack's one Grafana loads every product's dashboards from where each repository keeps
+# them (mounted by compose's platform.yml): the gateway's, which include the overview used as the
+# home dashboard, and the app's. The data source is pacod-gw's provisioning file, uid
+# "prometheus", which both sets select.
+apiVersion: 1
+
+providers:
+  - name: pacod-gw
+    orgId: 1
+    folder: pacod-gw
+    folderUid: pacod-gw
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards/gw
+
+  - name: pacod-ap
+    orgId: 1
+    folder: pacod
+    folderUid: pacod
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards/ap

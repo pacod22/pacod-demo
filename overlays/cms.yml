@@ -1,0 +1,22 @@
+# Adapts pacod-cms's app file (../pacod-cms/docker-compose.yml) to the full stack: sign-in
+# through the shared pacod-id, AI through the shared gateway, the website files under the demo's
+# .state/ instead of the cms checkout, and no published ports (the edge serves the studio and the
+# websites).
+services:
+  cms-mongo:
+    ports: !reset []
+
+  cms-site:
+    ports: !reset []
+    environment:
+      SITE_PUBLIC_SCHEME: http
+      SITE_PUBLIC_PORT: ${DEMO_HTTP_PORT}
+
+  cms-studio:
+    ports: !reset []
+    environment:
+      SITE_PUBLIC_SCHEME: http
+      SITE_PUBLIC_PORT: ${DEMO_HTTP_PORT}
+    depends_on:
+      pacod-id:
+        condition: service_healthy
