@@ -1,2 +1,4 @@
 .state/
 __pycache__/
+
+demo.env
