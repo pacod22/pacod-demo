@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 740" width="1280" height="740" role="img" aria-labelledby="t d">
+  <title id="t">pacod architecture: components and interfaces</title>
+  <desc id="d">pacod-id on the left provides OpenID Connect sign-in and a change feed to pacod-ap, pacod-cms and pacod-kb, which check access locally. The products send LLM calls in OpenAI, Anthropic or Gemini dialect to pacod-gw on the right, which holds provider keys, applies quotas and pricing, records usage in ClickHouse and forwards calls to LLM providers.</desc>
+  <defs>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+      .cap { font-size: 13px; font-weight: 700; fill: #8b93a7; letter-spacing: 1.6px; }
+      .name { font-size: 20px; font-weight: 700; fill: #f5f6fa; }
+      .role { font-size: 12px; font-weight: 700; letter-spacing: 1.2px; }
+      .item { font-size: 15px; fill: #d7dbe5; }
+      .sub { font-size: 14px; fill: #9aa3b5; }
+      .chip { font-size: 13px; font-weight: 600; }
+      .badge { font-size: 16px; font-weight: 800; }
+      .lbl { font-size: 13px; font-weight: 700; }
+      .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+    </style>
+    <marker id="mv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#a78bfa"/></marker>
+    <marker id="mt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#2dd4bf"/></marker>
+    <marker id="mn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8b93a7"/></marker>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#121521"/>
+      <stop offset="1" stop-color="#0c0e14"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="740" rx="24" fill="url(#bg)"/>
+  <text x="64" y="58" class="cap">ARCHITECTURE · COMPONENTS AND INTERFACES</text>
+
+  <!-- people strip -->
+  <rect x="460" y="80" width="360" height="52" rx="12" fill="#171a23" stroke="#2a2f3a"/>
+  <text x="640" y="112" class="item" text-anchor="middle">People &amp; services use the products</text>
+  <line x1="640" y1="134" x2="640" y2="174" stroke="#8b93a7" stroke-width="2.5" marker-end="url(#mn)"/>
+  <text x="652" y="160" class="sub">HTTPS</text>
+
+  <!-- ===== pacod-id (left) ===== -->
+  <rect x="64" y="180" width="256" height="426" rx="16" fill="#1c1630" stroke="#a78bfa" stroke-width="2"/>
+  <rect x="84" y="200" width="48" height="42" rx="10" fill="#a78bfa"/>
+  <text x="108" y="227" class="badge" text-anchor="middle" fill="#1c1630">ID</text>
+  <text x="146" y="220" class="name">pacod-id</text>
+  <text x="146" y="239" class="role" fill="#c4b5fd">IDENTITY &amp; ACCESS</text>
+  <line x1="84" y1="260" x2="300" y2="260" stroke="#3b2f5c"/>
+  <g class="item">
+    <text x="84" y="290">OpenID Connect provider</text>
+    <text x="84" y="320">Accounts · organisations</text>
+    <text x="84" y="350">Role bindings</text>
+    <text x="84" y="380">Change feed</text>
+    <text x="84" y="410">Branded sign-in pages</text>
+  </g>
+  <line x1="84" y1="432" x2="300" y2="432" stroke="#3b2f5c"/>
+  <text x="84" y="460" class="sub">Rules engine libraries</text>
+  <text x="84" y="482" class="item">Rust · TypeScript · Python</text>
+  <text x="84" y="516" class="sub">Built with</text>
+  <text x="84" y="538" class="item">Rust · axum · SvelteKit</text>
+  <rect x="84" y="556" width="104" height="28" rx="8" fill="none" stroke="#a78bfa" stroke-opacity=".6"/>
+  <text x="136" y="575" class="chip" fill="#c4b5fd" text-anchor="middle">PostgreSQL</text>
+
+  <!-- ===== products (middle) ===== -->
+  <!-- AP -->
+  <rect x="460" y="180" width="360" height="130" rx="14" fill="#151c2b" stroke="#3b82f6" stroke-opacity=".6"/>
+  <rect x="480" y="198" width="44" height="38" rx="9" fill="#60a5fa"/>
+  <text x="502" y="223" class="badge" text-anchor="middle" fill="#0f1117">AP</text>
+  <text x="538" y="215" class="name">pacod-ap</text>
+  <text x="538" y="233" class="role" fill="#93c5fd">AGENT PLATFORM</text>
+  <rect x="480" y="250" width="150" height="26" rx="7" fill="#1f2738"/><text x="555" y="268" class="chip" fill="#d7dbe5" text-anchor="middle">FastAPI · LangGraph</text>
+  <rect x="638" y="250" width="82" height="26" rx="7" fill="#1f2738"/><text x="679" y="268" class="chip" fill="#d7dbe5" text-anchor="middle">MCP tools</text>
+  <rect x="728" y="250" width="72" height="26" rx="7" fill="none" stroke="#a78bfa" stroke-opacity=".7"/><text x="764" y="268" class="chip" fill="#c4b5fd" text-anchor="middle">access</text>
+  <text x="480" y="296" class="sub">PostgreSQL · Redis · Qdrant</text>
+
+  <!-- CM -->
+  <rect x="460" y="328" width="360" height="130" rx="14" fill="#151c2b" stroke="#3b82f6" stroke-opacity=".6"/>
+  <rect x="480" y="346" width="44" height="38" rx="9" fill="#60a5fa"/>
+  <text x="502" y="371" class="badge" text-anchor="middle" fill="#0f1117">CM</text>
+  <text x="538" y="363" class="name">pacod-cms</text>
+  <text x="538" y="381" class="role" fill="#93c5fd">CONTENT MANAGEMENT</text>
+  <rect x="480" y="398" width="168" height="26" rx="7" fill="#1f2738"/><text x="564" y="416" class="chip" fill="#d7dbe5" text-anchor="middle">Spring Boot · Thymeleaf</text>
+  <rect x="656" y="398" width="64" height="26" rx="7" fill="#1f2738"/><text x="688" y="416" class="chip" fill="#d7dbe5" text-anchor="middle">studio</text>
+  <rect x="728" y="398" width="72" height="26" rx="7" fill="none" stroke="#a78bfa" stroke-opacity=".7"/><text x="764" y="416" class="chip" fill="#c4b5fd" text-anchor="middle">access</text>
+  <text x="480" y="444" class="sub">MongoDB — one database per site</text>
+
+  <!-- KB -->
+  <rect x="460" y="476" width="360" height="130" rx="14" fill="#151c2b" stroke="#3b82f6" stroke-opacity=".6"/>
+  <rect x="480" y="494" width="44" height="38" rx="9" fill="#60a5fa"/>
+  <text x="502" y="519" class="badge" text-anchor="middle" fill="#0f1117">KB</text>
+  <text x="538" y="511" class="name">pacod-kb</text>
+  <text x="538" y="529" class="role" fill="#93c5fd">RAG KNOWLEDGE BASE</text>
+  <rect x="480" y="546" width="70" height="26" rx="7" fill="#1f2738"/><text x="515" y="564" class="chip" fill="#d7dbe5" text-anchor="middle">FastAPI</text>
+  <rect x="558" y="546" width="162" height="26" rx="7" fill="#1f2738"/><text x="639" y="564" class="chip" fill="#d7dbe5" text-anchor="middle">BGE-M3 + BM25 hybrid</text>
+  <rect x="728" y="546" width="72" height="26" rx="7" fill="none" stroke="#a78bfa" stroke-opacity=".7"/><text x="764" y="564" class="chip" fill="#c4b5fd" text-anchor="middle">access</text>
+  <text x="480" y="592" class="sub">Qdrant · every version kept · CPU-only</text>
+
+  <!-- ===== identity links (ID <-> products) ===== -->
+  <line x1="324" y1="245" x2="456" y2="245" stroke="#a78bfa" stroke-width="2.5" stroke-dasharray="7 5" marker-start="url(#mv)" marker-end="url(#mv)"/>
+  <line x1="324" y1="393" x2="456" y2="393" stroke="#a78bfa" stroke-width="2.5" stroke-dasharray="7 5" marker-start="url(#mv)" marker-end="url(#mv)"/>
+  <line x1="324" y1="541" x2="456" y2="541" stroke="#a78bfa" stroke-width="2.5" stroke-dasharray="7 5" marker-start="url(#mv)" marker-end="url(#mv)"/>
+  <text x="390" y="312" class="lbl" fill="#a78bfa" text-anchor="middle">OIDC sign-in</text>
+  <text x="390" y="330" class="lbl" fill="#a78bfa" text-anchor="middle">+ change feed</text>
+  <text x="390" y="460" class="sub" text-anchor="middle">roles checked</text>
+  <text x="390" y="478" class="sub" text-anchor="middle">locally</text>
+
+  <!-- ===== model links (products -> GW) ===== -->
+  <line x1="824" y1="245" x2="956" y2="245" stroke="#2dd4bf" stroke-width="2.5" marker-end="url(#mt)"/>
+  <line x1="824" y1="393" x2="956" y2="393" stroke="#2dd4bf" stroke-width="2.5" marker-end="url(#mt)"/>
+  <line x1="824" y1="541" x2="956" y2="541" stroke="#2dd4bf" stroke-width="2.5" marker-end="url(#mt)"/>
+  <text x="890" y="312" class="lbl" fill="#2dd4bf" text-anchor="middle">LLM API calls</text>
+  <text x="890" y="330" class="lbl" fill="#2dd4bf" text-anchor="middle">no provider keys</text>
+  <text x="890" y="460" class="sub" text-anchor="middle">OpenAI · Anthropic</text>
+  <text x="890" y="478" class="sub" text-anchor="middle">· Gemini dialect</text>
+
+  <!-- ===== pacod-gw (right) ===== -->
+  <rect x="960" y="180" width="256" height="426" rx="16" fill="#0f2524" stroke="#2dd4bf" stroke-width="2"/>
+  <rect x="980" y="200" width="48" height="42" rx="10" fill="#2dd4bf"/>
+  <text x="1004" y="227" class="badge" text-anchor="middle" fill="#0f2524">GW</text>
+  <text x="1042" y="220" class="name">pacod-gw</text>
+  <text x="1042" y="239" class="role" fill="#99f6e4">AI GATEWAY</text>
+  <line x1="980" y1="260" x2="1196" y2="260" stroke="#1d4a46"/>
+  <g class="item">
+    <text x="980" y="290">Proxy &amp; managed modes</text>
+    <text x="980" y="320">Dialect translation</text>
+    <text x="980" y="350">Provider keys (only here)</text>
+    <text x="980" y="380">Quotas per workspace</text>
+    <text x="980" y="410">Price per call</text>
+  </g>
+  <line x1="980" y1="432" x2="1196" y2="432" stroke="#1d4a46"/>
+  <text x="980" y="460" class="sub">Console</text>
+  <text x="980" y="482" class="item">SvelteKit</text>
+  <text x="980" y="516" class="sub">Built with</text>
+  <text x="980" y="538" class="item">Rust core · Prometheus</text>
+  <rect x="980" y="556" width="100" height="28" rx="8" fill="none" stroke="#2dd4bf" stroke-opacity=".6"/>
+  <text x="1030" y="575" class="chip" fill="#99f6e4" text-anchor="middle">PostgreSQL</text>
+  <rect x="1088" y="556" width="104" height="28" rx="8" fill="none" stroke="#2dd4bf" stroke-opacity=".6"/>
+  <text x="1140" y="575" class="chip" fill="#99f6e4" text-anchor="middle">ClickHouse</text>
+
+  <!-- GW -> providers -->
+  <line x1="1088" y1="608" x2="1088" y2="642" stroke="#2dd4bf" stroke-width="2.5" marker-end="url(#mt)"/>
+  <rect x="960" y="646" width="256" height="58" rx="12" fill="#171a23" stroke="#2a2f3a"/>
+  <text x="1088" y="670" class="lbl" fill="#d7dbe5" text-anchor="middle">LLM PROVIDERS</text>
+  <text x="1088" y="692" class="sub" text-anchor="middle">OpenAI · Anthropic · Gemini · local</text>
+
+  <!-- legend -->
+  <g transform="translate(64 666)">
+    <line x1="0" y1="0" x2="40" y2="0" stroke="#a78bfa" stroke-width="2.5" stroke-dasharray="7 5"/>
+    <text x="52" y="5" class="sub">identity &amp; access</text>
+    <line x1="200" y1="0" x2="240" y2="0" stroke="#2dd4bf" stroke-width="2.5"/>
+    <text x="252" y="5" class="sub">model traffic</text>
+    <rect x="380" y="-13" width="56" height="26" rx="7" fill="none" stroke="#a78bfa" stroke-opacity=".7"/>
+    <text x="408" y="5" class="chip" fill="#c4b5fd" text-anchor="middle">access</text>
+    <text x="448" y="5" class="sub">local permission check</text>
+    <text x="0" y="34" class="sub">Each project also runs on its own with Docker Compose; Helm charts where it matters.</text>
+  </g>
+</svg>

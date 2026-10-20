@@ -11,6 +11,8 @@ SHELL := /bin/sh
 .DEFAULT_GOAL := help
 
 TOOLS := pacod-demo-tools:dev
+# Playwright with its browsers, for the home page's screenshots (make shots).
+SHOTS := pacod-demo-shots:dev
 # The compose project: the five repositories' own compose files plus the shared layer.
 COMPOSE = COMPOSE_PROFILES=$$(cat .state/profiles 2>/dev/null || echo ui) docker compose \
 	--project-directory . -f compose.yml
@@ -24,7 +26,7 @@ RECREATE := ap-api ap-admin-api ap-improvement-loop-worker ap-newsletter-worker 
 WAIT := --wait --wait-timeout 2400
 
 .PHONY: help up run verify down stop clean remove build status ps logs urls bootstrap \
-	preflight network tools init render seed hosts config
+	preflight network tools init render seed hosts config shots
 
 help:
 	@echo "pacod full-stack demo (configuration: demo.env)"
@@ -40,6 +42,7 @@ help:
 	@echo "  make build     rebuild the images from the five checkouts"
 	@echo "  make bootstrap redo the cross-product credentials (after adding a provider key)"
 	@echo "  make hosts     /etc/hosts lines, for browsers that do not resolve *.localhost"
+	@echo "  make shots     retake the home page's screenshots from the running stack"
 
 # ---- run ------------------------------------------------------------------------------------------
 
@@ -116,7 +119,7 @@ clean:
 	@# a component removed since) are not removed by down: every volume of the project is.
 	@vols=$$(docker volume ls -q --filter label=com.docker.compose.project=pacod-demo); \
 		if [ -n "$$vols" ]; then docker volume rm $$vols >/dev/null; fi
-	@if [ "$(IMAGES)" = 1 ]; then docker image rm $(TOOLS) >/dev/null 2>&1 || true; fi
+	@if [ "$(IMAGES)" = 1 ]; then docker image rm $(TOOLS) $(SHOTS) >/dev/null 2>&1 || true; fi
 	@rm -rf .state
 	@if [ -z "$$(docker ps -aq --filter network=pacod-net)" ]; then \
 		docker network rm pacod-net >/dev/null 2>&1 || true; fi
@@ -143,6 +146,7 @@ urls:
 	echo ""; \
 	echo "pacod demo: http://<name>.$$DEMO_DOMAIN:$$DEMO_HTTP_PORT"; \
 	echo ""; \
+	echo "  Home (every product)        http://$$DEMO_DOMAIN:$$DEMO_HTTP_PORT"; \
 	echo "  App (pacod-ap)              $$AP_ORIGIN"; \
 	echo "  Gateway console (pacod-gw)  $$GW_CONSOLE_ORIGIN"; \
 	echo "  Gateway API (OpenAI)        $$GW_API_ORIGIN/v1"; \
@@ -157,8 +161,16 @@ urls:
 	echo "  Password                    $$DEMO_ADMIN_PASSWORD"; \
 	echo ""
 
+# The home page's screenshots (home/screenshots/), taken from the running stack as its admin.
+shots: network
+	@docker image inspect $(SHOTS) >/dev/null 2>&1 || docker build -q -t $(SHOTS) tools/shots/ >/dev/null
+	@echo "shots: home/screenshots/"
+	@docker run --rm --network pacod-net --user $$(id -u):$$(id -g) -e HOME=/tmp \
+		-v "$(CURDIR):/work" --env-file .state/env/stack.env $(SHOTS) python3 -I /work/scripts/shots.py
+
 hosts:
 	@set -a; . ./demo.env; set +a; \
 	echo "# pacod demo: add to /etc/hosts for browsers that do not resolve *.$$DEMO_DOMAIN"; \
+	if [ "$$DEMO_DOMAIN" != localhost ]; then echo "127.0.0.1 $$DEMO_DOMAIN"; fi; \
 	for h in id app chat console gw studio demo minimal kb grafana mail prometheus; do \
 		echo "127.0.0.1 $$h.$$DEMO_DOMAIN"; done

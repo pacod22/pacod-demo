@@ -16,6 +16,15 @@
 
 import /etc/caddy/sites/*.caddy
 
+# The demo's home page (home/): every product, what it is, its admin and its websites. A template:
+# the links are made from DEMO_DOMAIN and DEMO_HTTP_PORT. The bare domain names this block, so it
+# wins over pacod-cms's catch-all (every host no other block names).
+http://{$DEMO_DOMAIN}:{$DEMO_HTTP_PORT} {
+	root * /srv/home
+	templates
+	file_server
+}
+
 # Grafana: the dashboards of every product, anonymous read-only.
 http://grafana.{$DEMO_DOMAIN}:{$DEMO_HTTP_PORT} {
 	reverse_proxy pacod-grafana:3000

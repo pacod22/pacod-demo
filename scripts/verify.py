@@ -99,6 +99,10 @@ def edge() -> None:
     check("knowledge base", E["KB_ORIGIN"] + "/kb/healthz", contains='"identity"')
     check("grafana", E["GRAFANA_ORIGIN"] + "/api/health")
     check("mail", E["MAIL_ORIGIN"] + "/", want=(200,))
+    # The home page answers at the bare domain, which on pacod-net is no host's name: ask the edge.
+    port = E["DEMO_HTTP_PORT"]
+    check("home page", f"http://pacod-caddy:{port}/", headers={"Host": f"{E['DEMO_DOMAIN']}:{port}"},
+          contains=f"http://studio.{E['DEMO_DOMAIN']}:{port}/")
 
 
 # ---- 2. Health of every service ------------------------------------------------------------------

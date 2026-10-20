@@ -1,0 +1,418 @@
+<!doctype html>
+{{- /* A Caddy template (config/Caddyfile): every address is made from the demo's domain and port. */ -}}
+{{- $d := env "DEMO_DOMAIN" }}{{ $p := env "DEMO_HTTP_PORT" }}{{ $email := env "DEMO_ADMIN_EMAIL" }}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pacod demo</title>
+<meta name="description" content="The whole pacod stack on one machine: identity, AI gateway, agents, CMS and knowledge base.">
+<style>
+	:root {
+		--bg: #0f1117;
+		--panel: #171a23;
+		--panel-2: #1f2330;
+		--line: #2a2f3a;
+		--text: #f5f6fa;
+		--muted: #9aa3b5;
+		--soft: #d7dbe5;
+		--id: #a78bfa;
+		--gw: #2dd4bf;
+		--pr: #60a5fa;
+		--on-accent: #0f1117;
+		--shadow: 0 18px 40px rgb(0 0 0 / .45);
+		color-scheme: dark;
+	}
+	@media (prefers-color-scheme: light) {
+		:root {
+			--bg: #f6f7fb;
+			--panel: #ffffff;
+			--panel-2: #eef0f5;
+			--line: #dde1ea;
+			--text: #12151c;
+			--muted: #5b6478;
+			--soft: #2a2f3a;
+			--id: #7c3aed;
+			--gw: #0f766e;
+			--pr: #2563eb;
+			--on-accent: #ffffff;
+			--shadow: 0 18px 40px rgb(18 21 28 / .12);
+			color-scheme: light;
+		}
+	}
+	* { box-sizing: border-box; }
+	html { -webkit-text-size-adjust: 100%; }
+	body {
+		margin: 0;
+		background: var(--bg);
+		color: var(--text);
+		font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+	}
+	a { color: inherit; }
+	code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9em; }
+	.wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+	/* Header */
+	.top { border-bottom: 1px solid var(--line); }
+	.top .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+	.brand { font-weight: 800; letter-spacing: .2px; text-decoration: none; }
+	.brand span { color: var(--muted); font-weight: 600; }
+	.top nav { margin-left: auto; display: flex; gap: 20px; font-size: 14px; }
+	.top nav a { color: var(--muted); text-decoration: none; }
+	.top nav a:hover { color: var(--text); }
+
+	/* Intro */
+	.intro { padding-top: 56px; padding-bottom: 32px; display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: center; }
+	.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
+	h1 { font-size: clamp(32px, 4.6vw, 50px); line-height: 1.08; margin: 12px 0 16px; letter-spacing: -.5px; }
+	.lead { font-size: 18px; color: var(--soft); margin: 0 0 24px; max-width: 34em; }
+	.signin {
+		background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+		padding: 14px 16px; font-size: 15px; color: var(--soft); max-width: 34em;
+	}
+	.signin strong { color: var(--text); }
+	.hero { margin: 0; }
+	.hero figcaption { font-size: 13px; color: var(--muted); margin-top: 10px; }
+	.hero figcaption strong { color: var(--soft); }
+	.hero figcaption a { color: var(--muted); }
+	.hero-img { width: 100%; height: auto; border-radius: 16px; border: 1px solid var(--line); background: #0f1117; display: block; }
+
+	/* Jump list */
+	.jump { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 8px; padding-bottom: 8px; }
+	.jump a {
+		display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 14px; font-weight: 600;
+		padding: 7px 12px 7px 7px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel);
+	}
+	.jump a:hover { border-color: var(--muted); }
+
+	/* Products */
+	h2 { font-size: 26px; margin: 0 0 6px; letter-spacing: -.2px; }
+	.section { padding: 48px 0 8px; }
+	.section > .wrap > p.sub { color: var(--muted); margin: 0 0 28px; }
+	.product {
+		--accent: var(--pr);
+		display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 40px; align-items: start;
+		background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 32px; margin-bottom: 28px;
+		scroll-margin-top: 16px;
+	}
+	.product.id { --accent: var(--id); }
+	.product.gw { --accent: var(--gw); }
+	.badge {
+		display: inline-grid; place-items: center; width: 30px; height: 26px; border-radius: 7px;
+		background: var(--accent, var(--pr)); color: var(--on-accent); font-size: 11px; font-weight: 800; letter-spacing: .5px;
+	}
+	.jump .id { --accent: var(--id); }
+	.jump .gw { --accent: var(--gw); }
+	.head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+	.head .badge { width: 40px; height: 34px; font-size: 13px; border-radius: 9px; }
+	.head h3 { margin: 0; font-size: 24px; }
+	.role { color: var(--accent); font-size: 13px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin: 10px 0 12px; }
+	.product p { margin: 0 0 12px; color: var(--soft); }
+	.stack { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 20px; padding: 0; list-style: none; }
+	.stack li { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
+	.links { display: grid; gap: 8px; }
+	.links .label { font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
+	.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+	.btn {
+		display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 14px; font-weight: 600;
+		padding: 8px 14px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2);
+	}
+	.btn:hover { border-color: var(--accent); }
+	.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+	.btn .host { font-weight: 400; opacity: .75; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+	.ext { font-size: 14px; color: var(--muted); margin-top: 6px; }
+	.ext a { color: var(--muted); }
+	.ext a:hover { color: var(--text); }
+
+	/* Screenshots: a browser frame with the address; a second one overlaps the first's corner. */
+	.shots { position: relative; }
+	.shots.two { padding-bottom: 22%; }
+	.frame {
+		display: block; text-decoration: none; border-radius: 12px; overflow: hidden;
+		border: 1px solid var(--line); background: var(--panel-2); box-shadow: var(--shadow);
+		transition: transform .15s ease;
+	}
+	.frame:hover { transform: translateY(-2px); }
+	.frame .bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+	.frame .bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+	.frame .bar span { margin-left: 8px; font-size: 12px; color: var(--muted); font-family: ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.frame img { display: block; width: 100%; height: auto; aspect-ratio: 1280 / 800; }
+	.shots.two .frame + .frame { position: absolute; right: -12px; bottom: 0; width: 58%; }
+	.caption { font-size: 13px; color: var(--muted); margin-top: 10px; }
+
+	/* Platform */
+	.grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+	.tile {
+		display: block; text-decoration: none; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px;
+	}
+	.tile:hover { border-color: var(--muted); }
+	.tile strong { display: block; font-size: 16px; margin-bottom: 4px; }
+	.tile span { display: block; font-size: 14px; color: var(--muted); }
+	.tile code { display: block; margin-top: 12px; color: var(--soft); font-size: 12px; }
+	.arch { width: 100%; height: auto; border-radius: 16px; border: 1px solid var(--line); background: #0f1117; display: block; }
+	.cmds { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; overflow-x: auto; margin: 0; font-size: 14px; line-height: 1.8; }
+	.cmds .c { color: var(--muted); }
+
+	footer { border-top: 1px solid var(--line); margin-top: 56px; padding: 24px 0 40px; color: var(--muted); font-size: 14px; }
+	footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+	footer a { color: var(--muted); }
+
+	@media (max-width: 900px) {
+		.intro { grid-template-columns: 1fr; padding-top: 36px; gap: 28px; }
+		.jump { padding-top: 0; }
+		.product { grid-template-columns: 1fr; padding: 20px; gap: 24px; }
+		.shots.two { padding-bottom: 0; }
+		.shots.two .frame + .frame { position: static; width: 100%; margin-top: 16px; }
+		.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+		.top nav .wide { display: none; }
+	}
+	@media (max-width: 560px) {
+		.wrap { padding-left: 16px; padding-right: 16px; }
+		.grid { grid-template-columns: 1fr; }
+		.top nav { gap: 14px; }
+	}
+	@media (prefers-reduced-motion: reduce) { .frame { transition: none; } .frame:hover { transform: none; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+	<div class="wrap">
+		<a class="brand" href="/">pacod <span>demo</span></a>
+		<nav>
+			<a href="#products">Products</a>
+			<a href="#platform">Platform</a>
+			<a class="wide" href="#how">How it fits</a>
+			<a class="wide" href="https://ai.pacod.io">ai.pacod.io</a>
+			<a href="https://github.com/pacod22">GitHub</a>
+		</nav>
+	</div>
+</header>
+
+<main>
+	<div class="wrap intro">
+		<div>
+			<div class="eyebrow">pacod-demo · running on this machine</div>
+			<h1>The whole pacod stack, working as one platform.</h1>
+			<p class="lead">
+				Identity, the AI gateway, the agent platform, the CMS and the knowledge base: five
+				open-source projects behind one address, one sign-in for all of them, and every model call
+				through one gateway.
+			</p>
+			<div class="signin">
+				Sign in anywhere as <strong class="mono">{{if $email}}{{$email}}{{else}}admin@pacod.demo{{end}}</strong>.
+				The password is in <code>demo.env</code>, or shown by <code>make urls</code>. One sign-in covers every product.
+			</div>
+		</div>
+		<figure class="hero">
+			<a href="https://ai.pacod.io"><img class="hero-img" src="pacod-hero.svg" width="1280" height="640"
+			alt="People and services sign in once through pacod-id, use AI products built on pacod-ap, pacod-cms and pacod-kb, and every model call goes through pacod-gw to any LLM provider"></a>
+			<figcaption><strong>pacod22</strong>, the organisation's profile: the overview of all five projects, at
+				<a href="https://ai.pacod.io">ai.pacod.io</a> and <a href="https://github.com/pacod22">github.com/pacod22</a>.</figcaption>
+		</figure>
+	</div>
+
+	<div class="wrap jump" aria-label="The products">
+		<a class="id" href="#pacod-id"><span class="badge">ID</span>pacod-id</a>
+		<a class="gw" href="#pacod-gw"><span class="badge">GW</span>pacod-gw</a>
+		<a href="#pacod-ap"><span class="badge">AP</span>pacod-ap</a>
+		<a href="#pacod-cms"><span class="badge">CM</span>pacod-cms</a>
+		<a href="#pacod-kb"><span class="badge">KB</span>pacod-kb</a>
+	</div>
+
+	<section class="section" id="products">
+		<div class="wrap">
+			<h2>The products</h2>
+			<p class="sub">Each is a complete product with its own repository; here they share one network, one database server and one sign-in.</p>
+
+			<!-- pacod-id -->
+			<article class="product id" id="pacod-id">
+				<div>
+					<div class="head"><span class="badge">ID</span><h3>pacod-id</h3></div>
+					<div class="role">Identity &amp; access</div>
+					<p>One place where people and machines sign in, and where it is recorded what they may do. An OpenID Connect provider for first-party applications: accounts, organisations, role bindings, and a change feed that products follow to decide access locally.</p>
+					<p>In the demo it is the one realm every product signs in with.</p>
+					<ul class="stack"><li>Rust</li><li>axum</li><li>PostgreSQL</li><li>OpenID Connect</li><li>SvelteKit</li></ul>
+					<div class="links">
+						<div class="label">In this demo</div>
+						<div class="btns">
+							<a class="btn primary" href="http://id.{{$d}}:{{$p}}/admin">Administration <span class="host">/admin</span></a>
+							<a class="btn" href="http://id.{{$d}}:{{$p}}/account">Your account</a>
+							<a class="btn" href="http://id.{{$d}}:{{$p}}/.well-known/openid-configuration">OIDC discovery</a>
+						</div>
+						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-id">Project page</a> · <a href="https://github.com/pacod22/pacod-id">Repository</a></div>
+					</div>
+				</div>
+				<div class="shots">
+					<a class="frame" href="http://id.{{$d}}:{{$p}}/admin">
+						<div class="bar"><i></i><i></i><i></i><span>id.{{$d}}:{{$p}}/admin</span></div>
+						<img src="screenshots/id-admin.png" width="1280" height="800" loading="lazy" alt="pacod-id administration: the accounts list and the form to create an account">
+					</a>
+				</div>
+			</article>
+
+			<!-- pacod-gw -->
+			<article class="product gw" id="pacod-gw">
+				<div>
+					<div class="head"><span class="badge">GW</span><h3>pacod-gw</h3></div>
+					<div class="role">AI gateway</div>
+					<p>Sits between applications and LLM providers. A Rust core relays or translates every call (OpenAI, Anthropic and Gemini formats), keeps provider keys out of the apps, enforces quotas, prices each request and streams usage into ClickHouse, managed from a SvelteKit console.</p>
+					<p>In the demo every product's model calls go through it; with no provider key set, its mock provider answers.</p>
+					<ul class="stack"><li>Rust</li><li>PostgreSQL</li><li>ClickHouse</li><li>SvelteKit</li></ul>
+					<div class="links">
+						<div class="label">In this demo</div>
+						<div class="btns">
+							<a class="btn primary" href="http://console.{{$d}}:{{$p}}/">Console <span class="host">console.{{$d}}</span></a>
+						</div>
+						<div class="ext">OpenAI-compatible API: <code>http://gw.{{$d}}:{{$p}}/v1</code> (with a gateway key)</div>
+						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-gw">Project page</a> · <a href="https://github.com/pacod22/pacod-gw">Repository</a></div>
+					</div>
+				</div>
+				<div class="shots">
+					<a class="frame" href="http://console.{{$d}}:{{$p}}/">
+						<div class="bar"><i></i><i></i><i></i><span>console.{{$d}}:{{$p}}</span></div>
+						<img src="screenshots/gw-console.png" width="1280" height="800" loading="lazy" alt="The gateway console's dashboard: requests, errors, cost, tokens and gateway delay today">
+					</a>
+				</div>
+			</article>
+
+			<!-- pacod-ap -->
+			<article class="product" id="pacod-ap">
+				<div>
+					<div class="head"><span class="badge">AP</span><h3>pacod-ap</h3></div>
+					<div class="role">Agent-building platform</div>
+					<p>Any number of self-contained AI agents on one deployment. Each agent has its own knowledge base, reference facts, prompts, directives, conversations and reviews, behind one sign-in and one admin console, with a review loop that improves every agent.</p>
+					<p>The demo runs the <em>starter</em> agent, a small fictional help desk.</p>
+					<ul class="stack"><li>FastAPI</li><li>LangGraph</li><li>MCP</li><li>SvelteKit</li><li>PostgreSQL</li><li>Redis</li><li>Qdrant</li></ul>
+					<div class="links">
+						<div class="label">In this demo</div>
+						<div class="btns">
+							<a class="btn primary" href="http://app.{{$d}}:{{$p}}/dashboard">Admin console <span class="host">/dashboard</span></a>
+							<a class="btn" href="http://app.{{$d}}:{{$p}}/">Website</a>
+							<a class="btn" href="http://app.{{$d}}:{{$p}}/chat">Chat</a>
+						</div>
+						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-ap">Project page</a> · <a href="https://github.com/pacod22/pacod-ap">Repository</a></div>
+					</div>
+				</div>
+				<div class="shots two">
+					<a class="frame" href="http://app.{{$d}}:{{$p}}/dashboard">
+						<div class="bar"><i></i><i></i><i></i><span>app.{{$d}}:{{$p}}/dashboard</span></div>
+						<img src="screenshots/ap-dashboard.png" width="1280" height="800" loading="lazy" alt="The agent platform's admin dashboard: indexed sources, tokens used, active users and answered requests">
+					</a>
+					<a class="frame" href="http://app.{{$d}}:{{$p}}/">
+						<div class="bar"><i></i><i></i><i></i><span>app.{{$d}}:{{$p}}</span></div>
+						<img src="screenshots/ap-site.png" width="1280" height="800" loading="lazy" alt="The agent platform's public website: Build and run your own AI agents">
+					</a>
+				</div>
+			</article>
+
+			<!-- pacod-cms -->
+			<article class="product" id="pacod-cms">
+				<div>
+					<div class="head"><span class="badge">CM</span><h3>pacod-cms</h3></div>
+					<div class="role">Content management</div>
+					<p>A CMS for editorial websites: articles, authors and categories, standing pages, an image library, advertising with an HTML5 banner builder, PDFs and journal issues, statistics, and multilingual content with AI translation. One installation hosts many websites, each with its own database, files and cache.</p>
+					<p>The demo has two websites: <em>Demo Journal</em> and <em>Demo Notes</em>.</p>
+					<ul class="stack"><li>Java 25</li><li>Spring Boot</li><li>Thymeleaf</li><li>MongoDB</li><li>Gotenberg</li></ul>
+					<div class="links">
+						<div class="label">In this demo</div>
+						<div class="btns">
+							<a class="btn primary" href="http://studio.{{$d}}:{{$p}}/">Studio <span class="host">studio.{{$d}}</span></a>
+							<a class="btn" href="http://demo.{{$d}}:{{$p}}/">Demo Journal</a>
+							<a class="btn" href="http://minimal.{{$d}}:{{$p}}/">Demo Notes</a>
+						</div>
+						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-cms">Project page</a> · <a href="https://github.com/pacod22/pacod-cms">Repository</a></div>
+					</div>
+				</div>
+				<div class="shots two">
+					<a class="frame" href="http://studio.{{$d}}:{{$p}}/">
+						<div class="bar"><i></i><i></i><i></i><span>studio.{{$d}}:{{$p}}/mgmt/sites</span></div>
+						<img src="screenshots/cms-studio.png" width="1280" height="800" loading="lazy" alt="The CMS studio: the list of websites, Demo Journal and Demo Notes">
+					</a>
+					<a class="frame" href="http://demo.{{$d}}:{{$p}}/">
+						<div class="bar"><i></i><i></i><i></i><span>demo.{{$d}}:{{$p}}</span></div>
+						<img src="screenshots/cms-site.png" width="1280" height="800" loading="lazy" alt="The Demo Journal website's home page">
+					</a>
+				</div>
+			</article>
+
+			<!-- pacod-kb -->
+			<article class="product" id="pacod-kb">
+				<div>
+					<div class="head"><span class="badge">KB</span><h3>pacod-kb</h3></div>
+					<div class="role">RAG knowledge base</div>
+					<p>A document knowledge base for retrieval-augmented generation: it ingests files and web pages, converts them to canonical Markdown, indexes them for hybrid semantic and keyword search, keeps every version, and hands models chunks with a stable metadata contract. CPU only, with built-in prompt-injection defence.</p>
+					<ul class="stack"><li>FastAPI</li><li>Qdrant</li><li>BGE-M3</li><li>BM25</li><li>HTMX</li></ul>
+					<div class="links">
+						<div class="label">In this demo</div>
+						<div class="btns">
+							<a class="btn primary" href="http://kb.{{$d}}:{{$p}}/kb">Knowledge base <span class="host">/kb</span></a>
+							<a class="btn" href="http://kb.{{$d}}:{{$p}}/kb/users">Members</a>
+						</div>
+						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-kb">Project page</a> · <a href="https://github.com/pacod22/pacod-kb">Repository</a></div>
+					</div>
+				</div>
+				<div class="shots">
+					<a class="frame" href="http://kb.{{$d}}:{{$p}}/kb">
+						<div class="bar"><i></i><i></i><i></i><span>kb.{{$d}}:{{$p}}/kb</span></div>
+						<img src="screenshots/kb.png" width="1280" height="800" loading="lazy" alt="The knowledge base's home: dashboard, ingest, search, documents and Qdrant">
+					</a>
+				</div>
+			</article>
+		</div>
+	</section>
+
+	<section class="section" id="platform">
+		<div class="wrap">
+			<h2>The shared platform</h2>
+			<p class="sub">One of each common component, used by every product.</p>
+			<div class="grid">
+				<a class="tile" href="http://grafana.{{$d}}:{{$p}}/">
+					<strong>Grafana</strong>
+					<span>The dashboards of every product; anonymous read access.</span>
+					<code>grafana.{{$d}}:{{$p}}</code>
+				</a>
+				<a class="tile" href="http://mail.{{$d}}:{{$p}}/">
+					<strong>Mail</strong>
+					<span>Every mail the stack sends: invitations, confirmations, resets.</span>
+					<code>mail.{{$d}}:{{$p}}</code>
+				</a>
+				<a class="tile" href="http://prometheus.{{$d}}:{{$p}}/">
+					<strong>Prometheus</strong>
+					<span>The metrics behind the dashboards, for ad-hoc queries.</span>
+					<code>prometheus.{{$d}}:{{$p}}</code>
+				</a>
+				<a class="tile" href="https://github.com/pacod22/pacod-demo">
+					<strong>pacod-demo</strong>
+					<span>This setup: one configuration file, one <code style="display:inline;margin:0">make</code>.</span>
+					<code>github.com/pacod22/pacod-demo</code>
+				</a>
+			</div>
+		</div>
+	</section>
+
+	<section class="section" id="how">
+		<div class="wrap">
+			<h2>How they fit together</h2>
+			<p class="sub">Every person signs in through pacod-id; every model call goes through pacod-gw. The products on top never hold a provider's key.</p>
+			<img class="arch" src="pacod-architecture.svg" width="1280" height="740" loading="lazy"
+				alt="Architecture: people and services sign in through pacod-id, which provides identity and roles to pacod-ap, pacod-cms and pacod-kb; every LLM call from these products goes through pacod-gw to the LLM providers">
+			<pre class="cmds" style="margin-top:28px"><span class="c"># in pacod-demo/</span>
+make urls      <span class="c"># the addresses and the admin's password</span>
+make verify    <span class="c"># check that everything works together</span>
+make shots     <span class="c"># retake this page's screenshots</span>
+make down      <span class="c"># stop; the data stays</span></pre>
+		</div>
+	</section>
+</main>
+
+<footer>
+	<div class="wrap">
+		<span>pacod · open source under Apache-2.0</span>
+		<a href="https://ai.pacod.io">ai.pacod.io</a>
+		<a href="https://github.com/pacod22">github.com/pacod22</a>
+	</div>
+</footer>
+
+</body>
+</html>

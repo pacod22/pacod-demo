@@ -9,7 +9,11 @@ make up        # build, start, bootstrap; prints the addresses and the admin's p
 make verify    # check that everything works together
 make down      # stop (data is kept)
 make clean     # remove everything the demo made (IMAGES=1: its images too)
+make shots     # retake the home page's screenshots from the running stack
 ```
+
+Then open **http://localhost:8800**: the demo's home page, with every product, what it is, a
+screenshot, and the links to its administration and its websites.
 
 ## What you need
 
@@ -38,6 +42,7 @@ Everything is behind one Caddy on one port (`DEMO_HTTP_PORT`, default 8800), as 
 
 | Address | What |
 |---|---|
+| http://localhost:8800 | the demo's home page: every product, with its links ([home/](home/)) |
 | http://app.localhost:8800 | the agent platform (pacod-ap): chat and its admin console |
 | http://console.localhost:8800 | the gateway console (pacod-gw): providers, models, keys, usage |
 | http://gw.localhost:8800/v1 | the gateway's OpenAI-compatible API |

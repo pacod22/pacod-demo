@@ -75,6 +75,7 @@ services:
     environment: !override
       DEMO_DOMAIN: ${DEMO_DOMAIN}
       DEMO_HTTP_PORT: ${DEMO_HTTP_PORT}
+      DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL}
       ID_SITE: ${ID_SITE}
       AP_SITE: ${AP_SITE}
       GW_CONSOLE_SITE: ${GW_CONSOLE_SITE}
@@ -92,6 +93,7 @@ services:
       - ../pacod-ap/platform/caddy/ap.caddy:/etc/caddy/sites/ap.caddy:ro
       - ../pacod-cms/platform/caddy/cms.caddy:/etc/caddy/sites/cms.caddy:ro
       - ../pacod-kb/platform/caddy/kb.caddy:/etc/caddy/sites/kb.caddy:ro
+      - ./home:/srv/home:ro
       - pacod-caddy-data:/data
       - pacod-caddy-config:/config
     # The public names also resolve inside pacod-net, to the edge: a container reaches the issuer
