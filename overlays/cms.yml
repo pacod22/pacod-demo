@@ -4,6 +4,10 @@
 # websites).
 services:
   cms-mongo:
+    # MongoDB 8.x refuses to start on Linux 6.19 through 7.0.13, and Docker Desktop's VM runs
+    # 7.0.0 (SERVER-121912). 7.0 is not affected; it cannot open data written by 8.x, so the
+    # cms-mongo-data volume must start empty. Drop this once the VM's kernel is 7.0.14 or newer.
+    image: mongo:7.0.45
     ports: !reset []
 
   cms-site:

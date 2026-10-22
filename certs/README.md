@@ -11,7 +11,7 @@ obtained from a CA.
 
 The certificate must cover `demo.pacod.io` and `*.demo.pacod.io`. One wildcard level is enough:
 `app.`, `id.`, `console.`, `gw.`, `studio.`, `kb.`, `grafana.`, `mail.`, `prometheus.`, and the
-CMS's websites `demo.` and `minimal.`.
+CMS's websites `cms.` and `minimal.`.
 
 **The files here now are placeholders:** a self-signed certificate for those names, so that the
 edge starts. Browsers warn about it, and the products cannot verify each other's sign-in

@@ -123,7 +123,7 @@ services:
           - console.${DEMO_DOMAIN}
           - gw.${DEMO_DOMAIN}
           - studio.${DEMO_DOMAIN}
-          - demo.${DEMO_DOMAIN}
+          - cms.${DEMO_DOMAIN}
           - minimal.${DEMO_DOMAIN}
           - kb.${DEMO_DOMAIN}
           - grafana.${DEMO_DOMAIN}

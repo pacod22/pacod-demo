@@ -98,7 +98,9 @@ verify:
 
 # ---- stop, remove ---------------------------------------------------------------------------------
 
-down:
+# Every target that runs compose renders first: the env files of an older checkout can lack
+# variables the compose files now read (compose then fails on, e.g., an empty port).
+down: render
 	$(COMPOSE) down --remove-orphans
 
 stop: down
@@ -108,9 +110,9 @@ clean:
 		printf 'This deletes every container, volume and secret of the demo%s. Continue? [y/N] ' \
 			"$$( [ '$(IMAGES)' = 1 ] && echo ', and its images' )"; \
 		read ans; [ "$$ans" = y ] || [ "$$ans" = Y ] || { echo "clean: nothing removed"; exit 1; }; fi
-	@# With its generated env files the project is taken down by compose (which also knows its
-	@# images); without them (a run that failed half-way) by its label.
-	@if [ -f .state/env/stack.env ]; then \
+	@# With its secrets the project is taken down by compose, from freshly rendered env files
+	@# (compose also knows its images); without them (a run that failed half-way) by its label.
+	@if [ -f .state/secrets.env ] && sh scripts/render-env.sh; then \
 		$(COMPOSE) down --volumes --remove-orphans $(if $(filter 1,$(IMAGES)),--rmi all); \
 	else \
 		ids=$$(docker ps -aq --filter label=com.docker.compose.project=pacod-demo); \
@@ -133,16 +135,16 @@ remove: clean
 build: network tools init render
 	COMPOSE_PARALLEL_LIMIT=2 $(COMPOSE) build
 
-status ps:
+status ps: render
 	@$(COMPOSE) ps --format 'table {{.Name}}\t{{.Status}}'
 
-logs:
+logs: render
 	$(COMPOSE) logs -f --tail=200 $(S)
 
 config: render
 	@$(COMPOSE) config -q && echo "config: the stack's compose files are valid"
 
-urls:
+urls: render
 	@set -a; . .state/env/stack.env; set +a; \
 	echo ""; \
 	echo "pacod demo: $$DEMO_URL_SCHEME://<name>.$$DEMO_DOMAIN$${DEMO_URL_PORT:+:$$DEMO_URL_PORT}"; \
@@ -163,7 +165,7 @@ urls:
 	echo ""
 
 # The home page's screenshots (home/screenshots/), taken from the running stack as its admin.
-shots: network
+shots: network render
 	@docker image inspect $(SHOTS) >/dev/null 2>&1 || docker build -q -t $(SHOTS) tools/shots/ >/dev/null
 	@echo "shots: home/screenshots/"
 	@docker run --rm --network pacod-net --user $$(id -u):$$(id -g) -e HOME=/tmp \
@@ -173,5 +175,5 @@ hosts:
 	@set -a; . ./demo.env; [ ! -f demo.local.env ] || . ./demo.local.env; set +a; \
 	echo "# pacod demo: add to /etc/hosts for browsers that do not resolve *.$$DEMO_DOMAIN"; \
 	if [ "$$DEMO_DOMAIN" != localhost ]; then echo "127.0.0.1 $$DEMO_DOMAIN"; fi; \
-	for h in id app chat console gw studio demo minimal kb grafana mail prometheus; do \
+	for h in id app chat console gw studio cms minimal kb grafana mail prometheus; do \
 		echo "127.0.0.1 $$h.$$DEMO_DOMAIN"; done

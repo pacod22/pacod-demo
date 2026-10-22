@@ -47,7 +47,7 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 | https://console.demo.pacod.io | the gateway console (pacod-gw): providers, models, keys, usage |
 | https://gw.demo.pacod.io/v1 | the gateway's OpenAI-compatible API |
 | https://studio.demo.pacod.io | the CMS studio (pacod-cms) |
-| https://demo.demo.pacod.io | a CMS demo website (also minimal.demo.pacod.io) |
+| https://cms.demo.pacod.io | a CMS demo website (also minimal.demo.pacod.io) |
 | https://kb.demo.pacod.io | the knowledge base (pacod-kb) |
 | https://id.demo.pacod.io/admin | identity administration (pacod-id) |
 | https://grafana.demo.pacod.io | dashboards of every product |
