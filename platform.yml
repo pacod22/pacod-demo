@@ -57,14 +57,14 @@ services:
     volumes: !override
       - pacod-qdrant-data:/qdrant/storage
 
-  # ---- Mail: every mail the stack sends ends here (http://mail.<domain>:<port>) -----------------
+  # ---- Mail: every mail the stack sends ends here (mail.<domain>) --------------------------------
   pacod-mailpit:
     extends:
       file: ../pacod-gw/deploy/docker-compose.standalone.dev.yml
       service: pacod-mailpit
     ports: !reset []
 
-  # ---- The edge: the only published port ----------------------------------------------------------
+  # ---- The edge: the only published ports (HTTP, and HTTPS with a certificate in certs/) ----------
   pacod-caddy:
     extends:
       file: ../pacod-gw/deploy/docker-compose.standalone.yml
@@ -72,17 +72,31 @@ services:
     depends_on: !reset {}
     ports: !override
       - "${DEMO_BIND}:${DEMO_HTTP_PORT}:${DEMO_HTTP_PORT}"
+      - "${DEMO_BIND}:${DEMO_HTTPS_PORT}:${DEMO_HTTPS_PORT}"
+      - "${DEMO_BIND}:${DEMO_HTTPS_PORT}:${DEMO_HTTPS_PORT}/udp"
     environment: !override
       DEMO_DOMAIN: ${DEMO_DOMAIN}
       DEMO_HTTP_PORT: ${DEMO_HTTP_PORT}
+      DEMO_HTTPS_PORT: ${DEMO_HTTPS_PORT}
+      DEMO_PUBLIC: ${DEMO_PUBLIC}
+      DEMO_URL_SCHEME: ${DEMO_URL_SCHEME}
+      DEMO_URL_PORT: ${DEMO_URL_PORT}
       DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL}
+      DEMO_ADMIN_PASSWORD_HASH: ${DEMO_ADMIN_PASSWORD_HASH}
+      DEMO_AUTO_HTTPS: ${DEMO_AUTO_HTTPS}
+      DEMO_TLS: ${DEMO_TLS}
+      DEMO_PRIVATE: ${DEMO_PRIVATE}
+      DEMO_HOME_SITE: ${DEMO_HOME_SITE}
+      GRAFANA_SITE: ${GRAFANA_SITE}
+      MAIL_SITE: ${MAIL_SITE}
+      PROMETHEUS_SITE: ${PROMETHEUS_SITE}
       ID_SITE: ${ID_SITE}
       AP_SITE: ${AP_SITE}
       GW_CONSOLE_SITE: ${GW_CONSOLE_SITE}
       GW_API_SITE: ${GW_API_SITE}
       GW_SITE_TLS: ""
       PGW_HSTS: max-age=0
-      PGW_ADMIN_ALLOW_CIDRS: 0.0.0.0/0
+      PGW_ADMIN_ALLOW_CIDRS: ${DEMO_ADMIN_ALLOW_CIDRS}
       CMS_STUDIO_SITE: ${CMS_STUDIO_SITE}
       CMS_PUBLIC_SITE: ${CMS_PUBLIC_SITE}
       KB_SITE: ${KB_SITE}
@@ -94,6 +108,8 @@ services:
       - ../pacod-cms/platform/caddy/cms.caddy:/etc/caddy/sites/cms.caddy:ro
       - ../pacod-kb/platform/caddy/kb.caddy:/etc/caddy/sites/kb.caddy:ro
       - ./home:/srv/home:ro
+      # The certificate and key that demo.env names (DEMO_TLS_CERT, DEMO_TLS_KEY).
+      - ./certs:/etc/caddy/tls:ro
       - pacod-caddy-data:/data
       - pacod-caddy-config:/config
     # The public names also resolve inside pacod-net, to the edge: a container reaches the issuer
@@ -101,6 +117,7 @@ services:
     networks: !override
       pacod-net:
         aliases:
+          - ${DEMO_DOMAIN}
           - id.${DEMO_DOMAIN}
           - app.${DEMO_DOMAIN}
           - console.${DEMO_DOMAIN}

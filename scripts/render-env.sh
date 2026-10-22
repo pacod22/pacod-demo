@@ -30,8 +30,58 @@ set +a
 
 d=$DEMO_DOMAIN
 p=$DEMO_HTTP_PORT
-url() { printf 'http://%s.%s:%s' "$1" "$d" "$p"; }
+hp=${DEMO_HTTPS_PORT:-443}
+# HTTPS when demo.env names a certificate (certs/): every address is https://, on DEMO_HTTPS_PORT,
+# and plain HTTP on DEMO_HTTP_PORT only redirects. Without one, plain HTTP on DEMO_HTTP_PORT.
+cert=${DEMO_TLS_CERT:-}
+key=${DEMO_TLS_KEY:-}
+if [ -n "$cert$key" ]; then
+	for f in "$cert" "$key"; do
+		[ -n "$f" ] && [ -f "certs/$f" ] || {
+			echo "render-env: DEMO_TLS_CERT and DEMO_TLS_KEY must both name a file in certs/ (see certs/README.md)" >&2
+			exit 1
+		}
+	done
+	scheme=https port=$hp default=443
+	auto_https=disable_certs
+	tls="tls /etc/caddy/tls/$cert /etc/caddy/tls/$key"
+else
+	scheme=http port=$p default=80
+	auto_https=off
+	tls=
+fi
+# The port in addresses: none when it is the scheme's default.
+if [ "$port" = "$default" ]; then url_port=; else url_port=$port; fi
+url() { printf '%s://%s.%s%s' "$scheme" "$1" "$d" "${url_port:+:$url_port}"; }
+origin=$scheme://$d${url_port:+:$url_port}
+# Published beyond this machine (DEMO_BIND not a loopback address): what is safe on a laptop is
+# closed. The mail viewer (it shows every reset and invitation link), Prometheus and Grafana (a
+# viewer can query Prometheus through it) ask for the admin's sign-in, the gateway console's
+# /grafana answers 403, and the app's dev tokens (dev-token-<user>, no password) are off.
+case $DEMO_BIND in
+	127.* | ::1 | localhost) public=false ;;
+	*) public=true ;;
+esac
 admin_password=${DEMO_ADMIN_PASSWORD:-$DEMO_ADMIN_PASSWORD_GENERATED}
+# The admin password's bcrypt hash, for the edge's basic auth. Made with the edge's own image and
+# kept in .state with the password's SHA-256, so it is made again only when the password changes
+# (a new hash on every run would recreate the edge on every `make up`).
+password_hash=
+private=
+admin_cidrs=0.0.0.0/0
+if [ "$public" = true ]; then
+	admin_cidrs=127.0.0.1/32
+	password_hash=$(PW=$admin_password docker run --rm -e PW --user "$(id -u):$(id -g)" \
+		-v "$state:/state" caddy:2.11.6-alpine sh -c '
+			umask 077
+			sum=$(printf %s "$PW" | sha256sum | cut -d" " -f1)
+			if [ "$(sed -n 1p /state/admin-password.bcrypt 2>/dev/null)" != "$sum" ]; then
+				printf "%s\n%s\n" "$sum" "$(caddy hash-password --plaintext "$PW")" > /state/admin-password.bcrypt
+			fi
+			sed -n 2p /state/admin-password.bcrypt')
+	[ -n "$password_hash" ] || { echo "render-env: could not hash the admin password" >&2; exit 1; }
+	private="import demo_private"
+fi
 # The embedding backend is fixed when the stack is first made: the vectors already stored in
 # Qdrant and the app's caches come from it, and the other backend's vectors live in a different
 # space (search would quietly return nonsense). auto picks the real model when Docker has the
@@ -62,7 +112,13 @@ DEMO_HOME=$home
 DEMO_STATE=$state
 DEMO_DOMAIN=$d
 DEMO_HTTP_PORT=$p
+DEMO_HTTPS_PORT=$hp
 DEMO_BIND=$DEMO_BIND
+DEMO_PUBLIC=$public
+# How addresses are spelled: the scheme, and the port when it is not the scheme's default.
+DEMO_URL_SCHEME=$scheme
+DEMO_URL_PORT=$url_port
+DEMO_ORIGIN=$origin
 DEMO_ADMIN_EMAIL=$DEMO_ADMIN_EMAIL
 DEMO_ADMIN_PASSWORD=$admin_password
 DEMO_PROFILES=$DEMO_PROFILES
@@ -80,6 +136,7 @@ CMS_DEMO_ORIGIN=$(url demo)
 KB_ORIGIN=$(url kb)
 GRAFANA_ORIGIN=$(url grafana)
 MAIL_ORIGIN=$(url mail)
+PROMETHEUS_ORIGIN=$(url prometheus)
 
 # The products' Caddy fragments (platform/caddy/*.caddy) read their addresses from these.
 ID_SITE=$(url id)
@@ -87,8 +144,21 @@ AP_SITE=$(url app)
 GW_CONSOLE_SITE=$(url console)
 GW_API_SITE=$(url gw)
 CMS_STUDIO_SITE=$(url studio)
-CMS_PUBLIC_SITE=http://:$p
+CMS_PUBLIC_SITE=$scheme://:$port
 KB_SITE=$(url kb)
+
+# The demo's own sites (config/Caddyfile). Quoted where a value has spaces or \$: compose reads
+# single-quoted values literally, and the Makefile sources this file.
+DEMO_HOME_SITE=$origin
+GRAFANA_SITE=$(url grafana)
+MAIL_SITE=$(url mail)
+PROMETHEUS_SITE=$(url prometheus)
+DEMO_AUTO_HTTPS=$auto_https
+DEMO_TLS='$tls'
+DEMO_PRIVATE='$private'
+DEMO_ADMIN_PASSWORD_HASH='$password_hash'
+# Who may open the gateway console's /grafana (pacod-gw's gw.caddy).
+DEMO_ADMIN_ALLOW_CIDRS=$admin_cidrs
 EOF
 	echo
 	echo "# Secrets (.state/secrets.env)."
@@ -194,9 +264,9 @@ POSTGRES_USER=pacod
 POSTGRES_DB=pacod
 POSTGRES_PASSWORD=$AP_DB_PASSWORD
 APP_ENV=development
-# Dev tokens (dev-token-<user>) let \`make verify\` run a chat turn without a browser; the demo
-# is published on $DEMO_BIND only.
-AUTH_ALLOW_DEV_TOKENS=true
+# Dev tokens (dev-token-<user>) let \`make verify\` run a chat turn without a browser. They need no
+# password, so only a demo kept on this machine (DEMO_BIND a loopback address) has them.
+AUTH_ALLOW_DEV_TOKENS=$([ "$public" = true ] && echo false || echo true)
 APP_LOG_LEVEL=INFO
 APP_SECRETS_KEY=$APP_SECRETS_KEY
 AGENT_PRIMARY_MODEL=$AP_PRIMARY_MODEL

@@ -1,7 +1,8 @@
 #!/bin/sh
 # Checks the machine before `make up`: Docker and Compose, memory and disk, the five sibling
-# repositories (on the shared-network layout), the demo's port, and that no other pacod stack
-# holds the shared container names. Prints what it finds; exits 1 on a blocking problem.
+# repositories (on the shared-network layout), the HTTPS certificate, the demo's ports, and that
+# no other pacod stack holds the shared container names. Prints what it finds; exits 1 on a
+# blocking problem.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -68,12 +69,33 @@ else
 	ok "no other pacod stack is running"
 fi
 
-if docker ps --format '{{.Names}} {{.Label "com.docker.compose.project"}}' | grep -q '^pacod-caddy pacod-demo$'; then
-	ok "port $port is the demo's own"
-elif (command -v lsof >/dev/null && lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1); then
-	bad "port $port is in use; free it or set DEMO_HTTP_PORT in demo.env"
-else
-	ok "port $port is free"
+# HTTPS: the certificate and key demo.env names, in certs/ (certs/README.md).
+cert=${DEMO_TLS_CERT:-}
+key=${DEMO_TLS_KEY:-}
+ports="$port"
+if [ -n "$cert$key" ]; then
+	ports="$port ${DEMO_HTTPS_PORT:-443}"
+	if [ -z "$cert" ] || [ -z "$key" ]; then
+		bad "set both DEMO_TLS_CERT and DEMO_TLS_KEY in demo.env, or neither (plain HTTP)"
+	elif [ ! -f "certs/$cert" ] || [ ! -f "certs/$key" ]; then
+		bad "certs/$cert and certs/$key must exist: the HTTPS certificate and its key (certs/README.md)"
+	elif ! grep -q -- '-----BEGIN CERTIFICATE-----' "certs/$cert" || ! grep -q -- '-----BEGIN .*PRIVATE KEY-----' "certs/$key"; then
+		bad "certs/$cert or certs/$key is not PEM (a certificate, an unencrypted private key)"
+	elif grep -q '^PLACEHOLDER' "certs/$cert"; then
+		warn "certs/$cert is the self-signed placeholder: browsers warn and the products' sign-in fails until the real certificate is there"
+	else
+		ok "certificate certs/$cert"
+	fi
 fi
+
+for pt in $ports; do
+	if docker ps --format '{{.Names}} {{.Label "com.docker.compose.project"}}' | grep -q '^pacod-caddy pacod-demo$'; then
+		ok "port $pt is the demo's own"
+	elif (command -v lsof >/dev/null && lsof -nP -iTCP:"$pt" -sTCP:LISTEN >/dev/null 2>&1); then
+		bad "port $pt is in use; free it or change the port in demo.env"
+	else
+		ok "port $pt is free"
+	fi
+done
 
 exit $fail

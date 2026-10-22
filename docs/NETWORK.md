@@ -110,7 +110,9 @@ root. Its standalone copies consume them, and so does the full stack: nothing is
 - Site blocks only, no global options block (an imported file cannot have one).
 - Addresses come from environment placeholders with the standalone value as default, e.g.
   `{$KB_SITE::8080}` or `{$AP_SITE:http://localhost:8080}`. The full stack sets them to
-  `http://<host>.<domain>:<port>`.
+  `https://<host>.<domain>` (a certificate in pacod-demo's certs/) or
+  `http://<host>.<domain>:<port>`; the full stack's Caddyfile loads the one certificate, and every
+  site whose name it covers is served with it.
 - Upstreams are the service names (`pacod-id:8070`, `cms-studio:7443`, ...).
 - A standalone Caddyfile is its global options plus `import /etc/caddy/sites/*.caddy`.
 - Only cms's public-site block catches every host.

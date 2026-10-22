@@ -41,7 +41,7 @@ help:
 	@echo "  make logs S=<service>   follow one service's log (all without S)"
 	@echo "  make build     rebuild the images from the five checkouts"
 	@echo "  make bootstrap redo the cross-product credentials (after adding a provider key)"
-	@echo "  make hosts     /etc/hosts lines, for browsers that do not resolve *.localhost"
+	@echo "  make hosts     /etc/hosts lines (Safari and *.localhost, or a domain before its DNS)"
 	@echo "  make shots     retake the home page's screenshots from the running stack"
 
 # ---- run ------------------------------------------------------------------------------------------
@@ -144,9 +144,9 @@ config: render
 urls:
 	@set -a; . .state/env/stack.env; set +a; \
 	echo ""; \
-	echo "pacod demo: http://<name>.$$DEMO_DOMAIN:$$DEMO_HTTP_PORT"; \
+	echo "pacod demo: $$DEMO_URL_SCHEME://<name>.$$DEMO_DOMAIN$${DEMO_URL_PORT:+:$$DEMO_URL_PORT}"; \
 	echo ""; \
-	echo "  Home (every product)        http://$$DEMO_DOMAIN:$$DEMO_HTTP_PORT"; \
+	echo "  Home (every product)        $$DEMO_ORIGIN"; \
 	echo "  App (pacod-ap)              $$AP_ORIGIN"; \
 	echo "  Gateway console (pacod-gw)  $$GW_CONSOLE_ORIGIN"; \
 	echo "  Gateway API (OpenAI)        $$GW_API_ORIGIN/v1"; \

@@ -2,3 +2,9 @@
 __pycache__/
 
 demo.env
+# The HTTPS certificate and key (certs/README.md): never committed.
+certs/demo.pacod.io.crt
+certs/demo.pacod.io.key
+# Any other certificate or key put there too; only the README is tracked.
+certs/*
+!certs/README.md

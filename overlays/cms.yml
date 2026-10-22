@@ -9,14 +9,14 @@ services:
   cms-site:
     ports: !reset []
     environment:
-      SITE_PUBLIC_SCHEME: http
-      SITE_PUBLIC_PORT: ${DEMO_HTTP_PORT}
+      SITE_PUBLIC_SCHEME: ${DEMO_URL_SCHEME}
+      SITE_PUBLIC_PORT: ${DEMO_URL_PORT}
 
   cms-studio:
     ports: !reset []
     environment:
-      SITE_PUBLIC_SCHEME: http
-      SITE_PUBLIC_PORT: ${DEMO_HTTP_PORT}
+      SITE_PUBLIC_SCHEME: ${DEMO_URL_SCHEME}
+      SITE_PUBLIC_PORT: ${DEMO_URL_PORT}
     depends_on:
       pacod-id:
         condition: service_healthy

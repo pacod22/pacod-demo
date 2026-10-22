@@ -1,6 +1,8 @@
 <!doctype html>
-{{- /* A Caddy template (config/Caddyfile): every address is made from the demo's domain and port. */ -}}
-{{- $d := env "DEMO_DOMAIN" }}{{ $p := env "DEMO_HTTP_PORT" }}{{ $email := env "DEMO_ADMIN_EMAIL" }}
+{{- /* A Caddy template (config/Caddyfile): every address is made from the demo's domain, scheme
+	and port (no port when it is the scheme's default). */ -}}
+{{- $d := env "DEMO_DOMAIN" }}{{ $s := env "DEMO_URL_SCHEME" }}{{ $p := "" }}{{ with env "DEMO_URL_PORT" }}{{ $p = printf ":%s" . }}{{ end }}
+{{- $email := env "DEMO_ADMIN_EMAIL" }}{{ $public := eq (env "DEMO_PUBLIC") "true" }}
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -192,17 +194,19 @@
 <main>
 	<div class="wrap intro">
 		<div>
-			<div class="eyebrow">pacod-demo · running on this machine</div>
+			<div class="eyebrow">pacod-demo · {{if $public}}{{$d}}{{else}}running on this machine{{end}}</div>
 			<h1>The whole pacod stack, working as one platform.</h1>
 			<p class="lead">
 				Identity, the AI gateway, the agent platform, the CMS and the knowledge base: five
 				open-source projects behind one address, one sign-in for all of them, and every model call
 				through one gateway.
 			</p>
+			{{- if not $public}}
 			<div class="signin">
 				Sign in anywhere as <strong class="mono">{{if $email}}{{$email}}{{else}}admin@pacod.demo{{end}}</strong>.
 				The password is in <code>demo.env</code>, or shown by <code>make urls</code>. One sign-in covers every product.
 			</div>
+			{{- end}}
 		</div>
 		<figure class="hero">
 			<a href="https://ai.pacod.io"><img class="hero-img" src="pacod-hero.svg" width="1280" height="640"
@@ -236,16 +240,16 @@
 					<div class="links">
 						<div class="label">In this demo</div>
 						<div class="btns">
-							<a class="btn primary" href="http://id.{{$d}}:{{$p}}/admin">Administration <span class="host">/admin</span></a>
-							<a class="btn" href="http://id.{{$d}}:{{$p}}/account">Your account</a>
-							<a class="btn" href="http://id.{{$d}}:{{$p}}/.well-known/openid-configuration">OIDC discovery</a>
+							<a class="btn primary" href="{{$s}}://id.{{$d}}{{$p}}/admin">Administration <span class="host">/admin</span></a>
+							<a class="btn" href="{{$s}}://id.{{$d}}{{$p}}/account">Your account</a>
+							<a class="btn" href="{{$s}}://id.{{$d}}{{$p}}/.well-known/openid-configuration">OIDC discovery</a>
 						</div>
 						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-id">Project page</a> · <a href="https://github.com/pacod22/pacod-id">Repository</a></div>
 					</div>
 				</div>
 				<div class="shots">
-					<a class="frame" href="http://id.{{$d}}:{{$p}}/admin">
-						<div class="bar"><i></i><i></i><i></i><span>id.{{$d}}:{{$p}}/admin</span></div>
+					<a class="frame" href="{{$s}}://id.{{$d}}{{$p}}/admin">
+						<div class="bar"><i></i><i></i><i></i><span>id.{{$d}}{{$p}}/admin</span></div>
 						<img src="screenshots/id-admin.png" width="1280" height="800" loading="lazy" alt="pacod-id administration: the accounts list and the form to create an account">
 					</a>
 				</div>
@@ -262,15 +266,15 @@
 					<div class="links">
 						<div class="label">In this demo</div>
 						<div class="btns">
-							<a class="btn primary" href="http://console.{{$d}}:{{$p}}/">Console <span class="host">console.{{$d}}</span></a>
+							<a class="btn primary" href="{{$s}}://console.{{$d}}{{$p}}/">Console <span class="host">console.{{$d}}</span></a>
 						</div>
-						<div class="ext">OpenAI-compatible API: <code>http://gw.{{$d}}:{{$p}}/v1</code> (with a gateway key)</div>
+						<div class="ext">OpenAI-compatible API: <code>{{$s}}://gw.{{$d}}{{$p}}/v1</code> (with a gateway key)</div>
 						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-gw">Project page</a> · <a href="https://github.com/pacod22/pacod-gw">Repository</a></div>
 					</div>
 				</div>
 				<div class="shots">
-					<a class="frame" href="http://console.{{$d}}:{{$p}}/">
-						<div class="bar"><i></i><i></i><i></i><span>console.{{$d}}:{{$p}}</span></div>
+					<a class="frame" href="{{$s}}://console.{{$d}}{{$p}}/">
+						<div class="bar"><i></i><i></i><i></i><span>console.{{$d}}{{$p}}</span></div>
 						<img src="screenshots/gw-console.png" width="1280" height="800" loading="lazy" alt="The gateway console's dashboard: requests, errors, cost, tokens and gateway delay today">
 					</a>
 				</div>
@@ -287,20 +291,20 @@
 					<div class="links">
 						<div class="label">In this demo</div>
 						<div class="btns">
-							<a class="btn primary" href="http://app.{{$d}}:{{$p}}/dashboard">Admin console <span class="host">/dashboard</span></a>
-							<a class="btn" href="http://app.{{$d}}:{{$p}}/">Website</a>
-							<a class="btn" href="http://app.{{$d}}:{{$p}}/chat">Chat</a>
+							<a class="btn primary" href="{{$s}}://app.{{$d}}{{$p}}/dashboard">Admin console <span class="host">/dashboard</span></a>
+							<a class="btn" href="{{$s}}://app.{{$d}}{{$p}}/">Website</a>
+							<a class="btn" href="{{$s}}://app.{{$d}}{{$p}}/chat">Chat</a>
 						</div>
 						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-ap">Project page</a> · <a href="https://github.com/pacod22/pacod-ap">Repository</a></div>
 					</div>
 				</div>
 				<div class="shots two">
-					<a class="frame" href="http://app.{{$d}}:{{$p}}/dashboard">
-						<div class="bar"><i></i><i></i><i></i><span>app.{{$d}}:{{$p}}/dashboard</span></div>
+					<a class="frame" href="{{$s}}://app.{{$d}}{{$p}}/dashboard">
+						<div class="bar"><i></i><i></i><i></i><span>app.{{$d}}{{$p}}/dashboard</span></div>
 						<img src="screenshots/ap-dashboard.png" width="1280" height="800" loading="lazy" alt="The agent platform's admin dashboard: indexed sources, tokens used, active users and answered requests">
 					</a>
-					<a class="frame" href="http://app.{{$d}}:{{$p}}/">
-						<div class="bar"><i></i><i></i><i></i><span>app.{{$d}}:{{$p}}</span></div>
+					<a class="frame" href="{{$s}}://app.{{$d}}{{$p}}/">
+						<div class="bar"><i></i><i></i><i></i><span>app.{{$d}}{{$p}}</span></div>
 						<img src="screenshots/ap-site.png" width="1280" height="800" loading="lazy" alt="The agent platform's public website: Build and run your own AI agents">
 					</a>
 				</div>
@@ -317,20 +321,20 @@
 					<div class="links">
 						<div class="label">In this demo</div>
 						<div class="btns">
-							<a class="btn primary" href="http://studio.{{$d}}:{{$p}}/">Studio <span class="host">studio.{{$d}}</span></a>
-							<a class="btn" href="http://demo.{{$d}}:{{$p}}/">Demo Journal</a>
-							<a class="btn" href="http://minimal.{{$d}}:{{$p}}/">Demo Notes</a>
+							<a class="btn primary" href="{{$s}}://studio.{{$d}}{{$p}}/">Studio <span class="host">studio.{{$d}}</span></a>
+							<a class="btn" href="{{$s}}://demo.{{$d}}{{$p}}/">Demo Journal</a>
+							<a class="btn" href="{{$s}}://minimal.{{$d}}{{$p}}/">Demo Notes</a>
 						</div>
 						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-cms">Project page</a> · <a href="https://github.com/pacod22/pacod-cms">Repository</a></div>
 					</div>
 				</div>
 				<div class="shots two">
-					<a class="frame" href="http://studio.{{$d}}:{{$p}}/">
-						<div class="bar"><i></i><i></i><i></i><span>studio.{{$d}}:{{$p}}/mgmt/sites</span></div>
+					<a class="frame" href="{{$s}}://studio.{{$d}}{{$p}}/">
+						<div class="bar"><i></i><i></i><i></i><span>studio.{{$d}}{{$p}}/mgmt/sites</span></div>
 						<img src="screenshots/cms-studio.png" width="1280" height="800" loading="lazy" alt="The CMS studio: the list of websites, Demo Journal and Demo Notes">
 					</a>
-					<a class="frame" href="http://demo.{{$d}}:{{$p}}/">
-						<div class="bar"><i></i><i></i><i></i><span>demo.{{$d}}:{{$p}}</span></div>
+					<a class="frame" href="{{$s}}://demo.{{$d}}{{$p}}/">
+						<div class="bar"><i></i><i></i><i></i><span>demo.{{$d}}{{$p}}</span></div>
 						<img src="screenshots/cms-site.png" width="1280" height="800" loading="lazy" alt="The Demo Journal website's home page">
 					</a>
 				</div>
@@ -346,15 +350,15 @@
 					<div class="links">
 						<div class="label">In this demo</div>
 						<div class="btns">
-							<a class="btn primary" href="http://kb.{{$d}}:{{$p}}/kb">Knowledge base <span class="host">/kb</span></a>
-							<a class="btn" href="http://kb.{{$d}}:{{$p}}/kb/users">Members</a>
+							<a class="btn primary" href="{{$s}}://kb.{{$d}}{{$p}}/kb">Knowledge base <span class="host">/kb</span></a>
+							<a class="btn" href="{{$s}}://kb.{{$d}}{{$p}}/kb/users">Members</a>
 						</div>
 						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-kb">Project page</a> · <a href="https://github.com/pacod22/pacod-kb">Repository</a></div>
 					</div>
 				</div>
 				<div class="shots">
-					<a class="frame" href="http://kb.{{$d}}:{{$p}}/kb">
-						<div class="bar"><i></i><i></i><i></i><span>kb.{{$d}}:{{$p}}/kb</span></div>
+					<a class="frame" href="{{$s}}://kb.{{$d}}{{$p}}/kb">
+						<div class="bar"><i></i><i></i><i></i><span>kb.{{$d}}{{$p}}/kb</span></div>
 						<img src="screenshots/kb.png" width="1280" height="800" loading="lazy" alt="The knowledge base's home: dashboard, ingest, search, documents and Qdrant">
 					</a>
 				</div>
@@ -367,20 +371,20 @@
 			<h2>The shared platform</h2>
 			<p class="sub">One of each common component, used by every product.</p>
 			<div class="grid">
-				<a class="tile" href="http://grafana.{{$d}}:{{$p}}/">
+				<a class="tile" href="{{$s}}://grafana.{{$d}}{{$p}}/">
 					<strong>Grafana</strong>
-					<span>The dashboards of every product; anonymous read access.</span>
-					<code>grafana.{{$d}}:{{$p}}</code>
+					<span>The dashboards of every product{{if $public}}. Asks for the admin's email and password.{{else}}; anonymous read access.{{end}}</span>
+					<code>grafana.{{$d}}{{$p}}</code>
 				</a>
-				<a class="tile" href="http://mail.{{$d}}:{{$p}}/">
+				<a class="tile" href="{{$s}}://mail.{{$d}}{{$p}}/">
 					<strong>Mail</strong>
-					<span>Every mail the stack sends: invitations, confirmations, resets.</span>
-					<code>mail.{{$d}}:{{$p}}</code>
+					<span>Every mail the stack sends: invitations, confirmations, resets.{{if $public}} Asks for the admin's email and password.{{end}}</span>
+					<code>mail.{{$d}}{{$p}}</code>
 				</a>
-				<a class="tile" href="http://prometheus.{{$d}}:{{$p}}/">
+				<a class="tile" href="{{$s}}://prometheus.{{$d}}{{$p}}/">
 					<strong>Prometheus</strong>
-					<span>The metrics behind the dashboards, for ad-hoc queries.</span>
-					<code>prometheus.{{$d}}:{{$p}}</code>
+					<span>The metrics behind the dashboards, for ad-hoc queries.{{if $public}} Asks for the admin's email and password.{{end}}</span>
+					<code>prometheus.{{$d}}{{$p}}</code>
 				</a>
 				<a class="tile" href="https://github.com/pacod22/pacod-demo">
 					<strong>pacod-demo</strong>

@@ -12,8 +12,9 @@ make clean     # remove everything the demo made (IMAGES=1: its images too)
 make shots     # retake the home page's screenshots from the running stack
 ```
 
-Then open **http://localhost:8800**: the demo's home page, with every product, what it is, a
-screenshot, and the links to its administration and its websites.
+Then open **https://demo.pacod.io** (or, for a demo on your machine, http://localhost:8800):
+the demo's home page, with every product, what it is, a screenshot, and the links to its
+administration and its websites.
 
 ## What you need
 
@@ -37,27 +38,54 @@ screenshot, and the links to its administration and its websites.
 
 ## The addresses
 
-Everything is behind one Caddy on one port (`DEMO_HTTP_PORT`, default 8800), as host names under
-`DEMO_DOMAIN` (default `localhost`, which browsers and curl resolve to 127.0.0.1 without DNS):
+Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `demo.pacod.io`):
 
 | Address | What |
 |---|---|
-| http://localhost:8800 | the demo's home page: every product, with its links ([home/](home/)) |
-| http://app.localhost:8800 | the agent platform (pacod-ap): chat and its admin console |
-| http://console.localhost:8800 | the gateway console (pacod-gw): providers, models, keys, usage |
-| http://gw.localhost:8800/v1 | the gateway's OpenAI-compatible API |
-| http://studio.localhost:8800 | the CMS studio (pacod-cms) |
-| http://demo.localhost:8800 | a CMS demo website (also minimal.localhost) |
-| http://kb.localhost:8800 | the knowledge base (pacod-kb) |
-| http://id.localhost:8800/admin | identity administration (pacod-id) |
-| http://grafana.localhost:8800 | dashboards of every product (anonymous read access) |
-| http://mail.localhost:8800 | every mail the stack sends (invitations, confirmations) |
+| https://demo.pacod.io | the demo's home page: every product, with its links ([home/](home/)) |
+| https://app.demo.pacod.io | the agent platform (pacod-ap): chat and its admin console |
+| https://console.demo.pacod.io | the gateway console (pacod-gw): providers, models, keys, usage |
+| https://gw.demo.pacod.io/v1 | the gateway's OpenAI-compatible API |
+| https://studio.demo.pacod.io | the CMS studio (pacod-cms) |
+| https://demo.demo.pacod.io | a CMS demo website (also minimal.demo.pacod.io) |
+| https://kb.demo.pacod.io | the knowledge base (pacod-kb) |
+| https://id.demo.pacod.io/admin | identity administration (pacod-id) |
+| https://grafana.demo.pacod.io | dashboards of every product |
+| https://mail.demo.pacod.io | every mail the stack sends (invitations, confirmations) |
+| https://prometheus.demo.pacod.io | the metrics, for ad-hoc queries |
 
 Sign in anywhere as `DEMO_ADMIN_EMAIL` (default `admin@pacod.demo`); the password is in
 `demo.env`, or generated and shown by `make urls`. One sign-in covers every product.
 
-Safari may not resolve `*.localhost`: use another browser, or add `make hosts`'s lines to
-`/etc/hosts`.
+### HTTPS on a domain
+
+With `DEMO_TLS_CERT` and `DEMO_TLS_KEY` set, the stack answers on HTTPS (`DEMO_HTTPS_PORT`, 443)
+with that one certificate, and plain HTTP (`DEMO_HTTP_PORT`, 80) only redirects to it. What it
+needs:
+
+- **DNS:** `demo.pacod.io` and `*.demo.pacod.io` pointing at the server. Before the DNS is set,
+  `make hosts` prints `/etc/hosts` lines to try it: as they are on the server itself; on another
+  machine, with the server's address instead of 127.0.0.1.
+- **The certificate:** for `demo.pacod.io` and `*.demo.pacod.io`, full chain, in
+  [certs/](certs/README.md). The files there now are self-signed placeholders: the edge starts,
+  but browsers warn and the products' sign-in fails until the real ones replace them. They
+  are not committed.
+- **Ports 80 and 443** free on the server (`DEMO_BIND=0.0.0.0`: every interface).
+
+Published beyond this machine (`DEMO_BIND` not a loopback address), the demo closes what is only
+safe on a laptop: the mail viewer (it shows every reset and invitation link), Prometheus and
+Grafana (a viewer can query Prometheus through it) ask for the admin's email and password, the
+gateway console's `/grafana` answers 403, the home page does not name the admin, and the app's
+dev tokens (sign-in without a password) are off, so `make verify` skips its chat turn. The
+products' own administration (pacod-ap's `/monitoring` included) is behind their sign-in as
+always.
+
+### A demo on this machine only
+
+In demo.env: `DEMO_DOMAIN=localhost`, `DEMO_TLS_CERT=` and `DEMO_TLS_KEY=` (empty),
+`DEMO_HTTP_PORT=8800`, `DEMO_BIND=127.0.0.1`. Then everything is plain HTTP at
+http://<name>.localhost:8800 (browsers and curl resolve `*.localhost` to 127.0.0.1 without DNS;
+Safari may not: use another browser, or add `make hosts`'s lines to `/etc/hosts`).
 
 ## Configuration: demo.env
 
@@ -113,5 +141,7 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
 | A model download reports "Not enough free disk space", or PostgreSQL fails to write | Docker's own disk is full (Docker Desktop: Settings, Resources, disk usage limit). `docker system df` shows what uses it; `docker builder prune` frees the build cache without touching images or data. |
 | Containers exit with code 137 | Docker ran out of memory: give it more (Docker Desktop: Settings, Resources) or set `EMBEDDINGS_BACKEND=hash`. |
 | `init: .state/secrets.env is missing but the demo's volumes exist` | The data needs the secrets that were deleted: `make clean`, then `make up`. |
-| Port 8800 is in use | Set `DEMO_HTTP_PORT` in demo.env; then `make clean` and `make up` (the address is part of the sign-in configuration). |
+| A port (80, 443, 8800) is in use | Change `DEMO_HTTP_PORT` or `DEMO_HTTPS_PORT` in demo.env; then `make clean` and `make up` (the address is part of the sign-in configuration). |
+| `preflight: certs/... is the self-signed placeholder`, sign-in fails, browsers warn | Put the real certificate and key in certs/ ([certs/README.md](certs/README.md)), then `docker restart pacod-caddy`. |
+| Caddy cannot read the key (Linux) | The edge runs as root without the capability to bypass file permissions: `sudo chown root:root certs/<key>`, or `chmod 644` it. |
 | Chat answers are "echo: ..." or off-topic | That is the mock provider: set a provider key in demo.env and run `make bootstrap`. |

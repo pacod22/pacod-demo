@@ -1,12 +1,16 @@
-# The full stack's one edge (pacod-caddy): plain HTTP on one port, every UI and API a host name
-# under DEMO_DOMAIN. The site blocks are the products' own: each repository ships them in
-# platform/caddy/<product>.caddy, mounted into /etc/caddy/sites/ (compose's platform.yml), and
-# reads its address from a *_SITE variable that scripts/render-env.sh sets, e.g.
+# The full stack's one edge (pacod-caddy): every UI and API a host name under DEMO_DOMAIN. The site
+# blocks are the products' own: each repository ships them in platform/caddy/<product>.caddy,
+# mounted into /etc/caddy/sites/ (compose's platform.yml), and reads its address from a *_SITE
+# variable that scripts/render-env.sh sets, e.g. AP_SITE=https://app.demo.pacod.io or
 # AP_SITE=http://app.localhost:8800. Only the platform's own sites are written here.
 {
-	# Plain HTTP: a local demo has no certificates to obtain.
-	auto_https off
+	# With a certificate in certs/ (demo.env's DEMO_TLS_CERT), disable_certs: HTTPS with that one
+	# certificate, which the home page's block loads (DEMO_TLS) and which then serves every site
+	# whose name it covers (DEMO_DOMAIN and *.DEMO_DOMAIN); nothing is asked of a CA, and plain
+	# HTTP answers with a redirect. Without one, off: plain HTTP only, a local demo.
+	auto_https {$DEMO_AUTO_HTTPS}
 	http_port {$DEMO_HTTP_PORT}
+	https_port {$DEMO_HTTPS_PORT}
 	admin 0.0.0.0:2019
 	servers {
 		# Per-host request metrics for Prometheus (job "caddy", scraped on :9180 below).
@@ -14,29 +18,45 @@
 	}
 }
 
+# The admin's sign-in in front of a site, on a demo published beyond this machine: DEMO_PRIVATE is
+# `import demo_private` there, empty on a local demo.
+(demo_private) {
+	basic_auth {
+		{$DEMO_ADMIN_EMAIL} {$DEMO_ADMIN_PASSWORD_HASH}
+	}
+	# The edge's sign-in ends here: the site behind it never sees the header (Grafana would take it
+	# for a sign-in of its own and refuse it).
+	request_header -Authorization
+}
+
 import /etc/caddy/sites/*.caddy
 
 # The demo's home page (home/): every product, what it is, its admin and its websites. A template:
-# the links are made from DEMO_DOMAIN and DEMO_HTTP_PORT. The bare domain names this block, so it
-# wins over pacod-cms's catch-all (every host no other block names).
-http://{$DEMO_DOMAIN}:{$DEMO_HTTP_PORT} {
+# the links are made from DEMO_DOMAIN, DEMO_URL_SCHEME and DEMO_URL_PORT. The bare domain names
+# this block, so it wins over pacod-cms's catch-all (every host no other block names).
+{$DEMO_HOME_SITE} {
+	{$DEMO_TLS}
 	root * /srv/home
 	templates
 	file_server
 }
 
-# Grafana: the dashboards of every product, anonymous read-only.
-http://grafana.{$DEMO_DOMAIN}:{$DEMO_HTTP_PORT} {
+# Grafana: the dashboards of every product, anonymous read-only. On a public demo behind the
+# admin's sign-in too: a viewer can query Prometheus through it.
+{$GRAFANA_SITE} {
+	{$DEMO_PRIVATE}
 	reverse_proxy pacod-grafana:3000
 }
 
-# The mail sink: every mail the stack sends (invitations, confirmations) ends here.
-http://mail.{$DEMO_DOMAIN}:{$DEMO_HTTP_PORT} {
+# The mail sink: every mail the stack sends (invitations, confirmations, reset links) ends here.
+{$MAIL_SITE} {
+	{$DEMO_PRIVATE}
 	reverse_proxy pacod-mailpit:8025
 }
 
 # Prometheus, for ad-hoc queries.
-http://prometheus.{$DEMO_DOMAIN}:{$DEMO_HTTP_PORT} {
+{$PROMETHEUS_SITE} {
+	{$DEMO_PRIVATE}
 	reverse_proxy pacod-prometheus:9090
 }
 

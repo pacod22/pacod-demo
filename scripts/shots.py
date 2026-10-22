@@ -5,9 +5,10 @@ sign-in completes against that session, and writes home/screenshots/<name>.png: 
 light mode. Pages that show secrets (gateway keys, provider settings, mails with their links) are
 left out on purpose: the screenshots are committed. The password is never printed.
 
-Chromium resolves every *.localhost name to its own loopback, whatever Docker's DNS says: the
-resolver rule sends them to the edge (pacod-caddy), and the pages keep their real host names, the
-ones the products' sign-in redirects are registered for.
+Chromium resolves every *.localhost name to its own loopback, whatever Docker's DNS says, and a
+public domain to wherever its DNS points: the resolver rule sends the demo's names to the edge
+(pacod-caddy) on pacod-net, and the pages keep their real host names, the ones the products'
+sign-in redirects are registered for.
 """
 
 from __future__ import annotations

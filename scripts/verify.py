@@ -23,6 +23,8 @@ import gw_bootstrap as gw  # noqa: E402
 
 E = os.environ
 ISSUER = E["PACOD_ID_ISSUER"]
+# A demo published beyond this machine (render-env.sh): private sites, no dev tokens.
+PUBLIC = E.get("DEMO_PUBLIC") == "true"
 fails = 0
 
 
@@ -97,12 +99,27 @@ def edge() -> None:
     check("cms studio", E["CMS_STUDIO_ORIGIN"] + "/mgmt/login", want=(200, 302))
     check("cms demo website", E["CMS_DEMO_ORIGIN"] + "/", want=(200,))
     check("knowledge base", E["KB_ORIGIN"] + "/kb/healthz", contains='"identity"')
-    check("grafana", E["GRAFANA_ORIGIN"] + "/api/health")
-    check("mail", E["MAIL_ORIGIN"] + "/", want=(200,))
-    # The home page answers at the bare domain, which on pacod-net is no host's name: ask the edge.
-    port = E["DEMO_HTTP_PORT"]
-    check("home page", f"http://pacod-caddy:{port}/", headers={"Host": f"{E['DEMO_DOMAIN']}:{port}"},
-          contains=f"http://studio.{E['DEMO_DOMAIN']}:{port}/")
+    if not PUBLIC:
+        check("grafana", E["GRAFANA_ORIGIN"] + "/api/health")
+    if PUBLIC:
+        # Published beyond this machine: the mail viewer, Prometheus and Grafana ask for the
+        # admin's sign-in.
+        admin = base64.b64encode(f"{E['DEMO_ADMIN_EMAIL']}:{E['DEMO_ADMIN_PASSWORD']}".encode()).decode()
+        for name, url in [("mail", E["MAIL_ORIGIN"] + "/"), ("prometheus", E["PROMETHEUS_ORIGIN"] + "/"),
+                          ("grafana", E["GRAFANA_ORIGIN"] + "/api/health")]:
+            check(f"{name} asks for a sign-in", url, want=(401,))
+            check(f"{name} opens with the admin's", url, want=(200, 302),
+                  headers={"Authorization": f"Basic {admin}"})
+    else:
+        check("mail", E["MAIL_ORIGIN"] + "/", want=(200,))
+    # The home page answers at the bare domain. On pacod-net that name is the edge's (an alias),
+    # except `localhost`, which is every container's own: there, ask the edge with its Host.
+    if E["DEMO_DOMAIN"] == "localhost":
+        port = E["DEMO_HTTP_PORT"]
+        home, hdrs = f"http://pacod-caddy:{port}/", {"Host": f"localhost:{port}"}
+    else:
+        home, hdrs = E["DEMO_ORIGIN"] + "/", {}
+    check("home page", home, headers=hdrs, contains=E["CMS_STUDIO_ORIGIN"] + "/")
 
 
 # ---- 2. Health of every service ------------------------------------------------------------------
@@ -250,6 +267,9 @@ def gateway() -> None:
 # ---- 5. The app: one streamed chat turn -----------------------------------------------------------
 def app() -> None:
     section("app (pacod-ap: a chat turn through the gateway)")
+    if PUBLIC:
+        report(None, "skipped: the turn signs in with a dev token, and a public demo has none")
+        return
     classifier = json.dumps({"is_relevant": True, "confidence": 0.95, "detected_language": "en",
                              "reason": "a pricing question", "needs_clarification": False, "follow_ups": []})
     planner = json.dumps({"is_complex": False, "tool_calls": [
