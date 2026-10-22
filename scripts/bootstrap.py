@@ -61,7 +61,7 @@ def gateway() -> None:
     providers = gw.read_env(gw.PROVIDERS_ENV)
     live = any(providers.get(v) for v in gw.PROVIDER_KEYS.values())
     env = "live" if live else "dev"
-    say(f"gateway: {'real providers (a key is set in demo.env)' if live else 'the mock provider'}")
+    say(f"gateway: {'real providers (a key is set in demo.local.env)' if live else 'the mock provider'}")
     # The admin token always comes the development way, through the bootstrap admin's sign-in at
     # pacod-id (the live way expects a token made by hand in the console).
     api = gw.admin_api("dev", ADMIN_URL, ISSUER)

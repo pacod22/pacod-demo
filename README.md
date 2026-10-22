@@ -55,7 +55,7 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 | https://prometheus.demo.pacod.io | the metrics, for ad-hoc queries |
 
 Sign in anywhere as `DEMO_ADMIN_EMAIL` (default `admin@pacod.demo`); the password is in
-`demo.env`, or generated and shown by `make urls`. One sign-in covers every product.
+`demo.local.env`, or generated and shown by `make urls`. One sign-in covers every product.
 
 ### HTTPS on a domain
 
@@ -87,11 +87,20 @@ In demo.env: `DEMO_DOMAIN=localhost`, `DEMO_TLS_CERT=` and `DEMO_TLS_KEY=` (empt
 http://<name>.localhost:8800 (browsers and curl resolve `*.localhost` to 127.0.0.1 without DNS;
 Safari may not: use another browser, or add `make hosts`'s lines to `/etc/hosts`).
 
-## Configuration: demo.env
+## Configuration: demo.env and demo.local.env
 
-The only file to edit. It sets the domain and port, the first administrator, the optional
-component (`DEMO_PROFILES=ingestion`), the LLM provider keys, the models each
-product uses and the embedding backend. Run `make up` after a change.
+`demo.env` is the configuration, and it is committed. It sets the domain and ports, the
+certificate, the first administrator's email, the optional component (`DEMO_PROFILES=ingestion`),
+the models each product uses and the embedding backend. Run `make up` after a change.
+
+`demo.local.env` holds this machine's secrets: the admin's password and the LLM provider keys.
+Git ignores it. It is read after `demo.env`, and what it sets wins:
+
+```sh
+# demo.local.env
+DEMO_ADMIN_PASSWORD=a-long-passphrase
+ANTHROPIC_API_KEY=sk-...
+```
 
 **Optional component.** `ingestion` runs the app's document ingestion service and loads the
 starter agent's knowledge base (its corpus); without it the starter agent answers from its
@@ -103,7 +112,8 @@ switching between `bge` and `hash` later needs `make clean`.
 
 **LLM providers.** With no key set, every model call goes to the gateway's mock provider: the
 demo runs offline and `make verify` is deterministic, but chat answers are canned. Set
-`ANTHROPIC_API_KEY` (the app's default models are Anthropic's) and others as you like, then
+`ANTHROPIC_API_KEY` (the app's default models are Anthropic's) and others as you like in
+`demo.local.env`, then
 `make bootstrap`: the gateway is set up with the real providers.
 
 ## How it is put together
@@ -144,4 +154,4 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
 | A port (80, 443, 8800) is in use | Change `DEMO_HTTP_PORT` or `DEMO_HTTPS_PORT` in demo.env; then `make clean` and `make up` (the address is part of the sign-in configuration). |
 | `preflight: certs/... is the self-signed placeholder`, sign-in fails, browsers warn | Put the real certificate and key in certs/ ([certs/README.md](certs/README.md)), then `docker restart pacod-caddy`. |
 | Caddy cannot read the key (Linux) | The edge runs as root without the capability to bypass file permissions: `sudo chown root:root certs/<key>`, or `chmod 644` it. |
-| Chat answers are "echo: ..." or off-topic | That is the mock provider: set a provider key in demo.env and run `make bootstrap`. |
+| Chat answers are "echo: ..." or off-topic | That is the mock provider: set a provider key in demo.local.env and run `make bootstrap`. |

@@ -1,4 +1,5 @@
-# The pacod full stack on one machine. Edit demo.env, then:
+# The pacod full stack on one machine. Edit demo.env (and demo.local.env for the password and
+# provider keys, never committed), then:
 #
 #   make up        build what is missing, start everything, bootstrap, print the addresses
 #   make verify    check that the stack works as one platform
@@ -56,7 +57,7 @@ up: preflight network tools init render
 run: up
 
 preflight:
-	@set -a; . ./demo.env; set +a; sh scripts/preflight.sh
+	@set -a; . ./demo.env; [ ! -f demo.local.env ] || . ./demo.local.env; set +a; sh scripts/preflight.sh
 
 network:
 	@docker network inspect pacod-net >/dev/null 2>&1 || docker network create pacod-net >/dev/null
@@ -169,7 +170,7 @@ shots: network
 		-v "$(CURDIR):/work" --env-file .state/env/stack.env $(SHOTS) python3 -I /work/scripts/shots.py
 
 hosts:
-	@set -a; . ./demo.env; set +a; \
+	@set -a; . ./demo.env; [ ! -f demo.local.env ] || . ./demo.local.env; set +a; \
 	echo "# pacod demo: add to /etc/hosts for browsers that do not resolve *.$$DEMO_DOMAIN"; \
 	if [ "$$DEMO_DOMAIN" != localhost ]; then echo "127.0.0.1 $$DEMO_DOMAIN"; fi; \
 	for h in id app chat console gw studio demo minimal kb grafana mail prometheus; do \

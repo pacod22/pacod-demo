@@ -2,6 +2,8 @@
 __pycache__/
 
 demo.env
+# The machine's own values for demo.env: the admin's password, provider keys.
+demo.local.env
 # The HTTPS certificate and key (certs/README.md): never committed.
 certs/demo.pacod.io.crt
 certs/demo.pacod.io.key

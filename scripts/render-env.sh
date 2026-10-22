@@ -24,6 +24,8 @@ touch "$state/bootstrap.env"
 
 set -a
 . ./demo.env
+# The machine's own values (the admin's password, provider keys), never committed: they win.
+if [ -f ./demo.local.env ]; then . ./demo.local.env; fi
 . "$state/secrets.env"
 . "$state/bootstrap.env"
 set +a
