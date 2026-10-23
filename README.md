@@ -89,9 +89,11 @@ Safari may not: use another browser, or add `make hosts`'s lines to `/etc/hosts`
 
 ## Configuration: demo.env and demo.local.env
 
-`demo.env` is the configuration, and it is committed. It sets the domain and ports, the
-certificate, the first administrator's email, the optional component (`DEMO_PROFILES=ingestion`),
-the models each product uses and the embedding backend. Run `make up` after a change.
+`demo.env` is the configuration. It sets the domain and ports, the certificate, the first
+administrator's email, the optional component (`DEMO_PROFILES=ingestion`), the models each
+product uses, the embedding backend and the log directory. Run `make up` after a change. Git
+ignores it: the first `make` copies it from `demo.env.example`, the committed template; change
+the template only for what every machine should get.
 
 `demo.local.env` holds this machine's secrets: the admin's password and the LLM provider keys.
 Git ignores it. It is read after `demo.env`, and what it sets wins:

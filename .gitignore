@@ -1,6 +1,7 @@
 .state/
 __pycache__/
 
+# The machine's configuration, copied from demo.env.example (the committed template) by make.
 demo.env
 # The machine's own values for demo.env: the admin's password, provider keys.
 demo.local.env

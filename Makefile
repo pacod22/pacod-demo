@@ -56,7 +56,12 @@ up: preflight network tools init render
 
 run: up
 
-preflight:
+# The machine's configuration: git ignores it; the first run copies the committed template.
+demo.env:
+	@cp demo.env.example $@
+	@echo "demo.env: copied from demo.env.example; edit it, then run make again" >&2; exit 1
+
+preflight: demo.env
 	@set -a; . ./demo.env; [ ! -f demo.local.env ] || . ./demo.local.env; set +a; sh scripts/preflight.sh
 
 network:
@@ -73,7 +78,7 @@ init: tools
 	@mkdir -p .state
 	@docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR):/work" $(TOOLS) sh scripts/init-secrets.sh
 
-render:
+render: demo.env
 	@sh scripts/render-env.sh
 
 # The cross-product credentials (gateway keys, service tokens), then the services that read them
