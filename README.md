@@ -47,7 +47,7 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 | https://console.demo.pacod.io | the gateway console (pacod-gw): providers, models, keys, usage |
 | https://gw.demo.pacod.io/v1 | the gateway's OpenAI-compatible API |
 | https://studio.demo.pacod.io | the CMS studio (pacod-cms) |
-| https://cms.demo.pacod.io | a CMS demo website (also minimal.demo.pacod.io) |
+| https://cms.pacod-sites.net | a CMS demo website (also minimal.pacod-sites.net): the websites have a domain of their own, `DEMO_SITE_DOMAIN` (below) |
 | https://kb.demo.pacod.io | the knowledge base (pacod-kb) |
 | https://id.demo.pacod.io/admin | identity administration (pacod-id) |
 | https://grafana.demo.pacod.io | dashboards of every product |
@@ -63,11 +63,15 @@ With `DEMO_TLS_CERT` and `DEMO_TLS_KEY` set, the stack answers on HTTPS (`DEMO_H
 with that one certificate, and plain HTTP (`DEMO_HTTP_PORT`, 80) only redirects to it. What it
 needs:
 
-- **DNS:** `demo.pacod.io` and `*.demo.pacod.io` pointing at the server. Before the DNS is set,
-  `make hosts` prints `/etc/hosts` lines to try it: as they are on the server itself; on another
+- **The websites' domain:** `DEMO_SITE_DOMAIN`, another registrable domain than `DEMO_DOMAIN`'s
+  (`pacod-sites.net` in these examples; not `sites.pacod.io`). A website runs its owner's
+  script, which on the studio's registrable domain could set cookies the studio and the sign-in
+  receive: the studio refuses to start then, and `make up` stops before it when it can tell.
+- **DNS:** `demo.pacod.io`, `*.demo.pacod.io` and `*.pacod-sites.net` pointing at the server.
+  Before the DNS is set, `make hosts` prints `/etc/hosts` lines to try it: as they are on the server itself; on another
   machine, with the server's address instead of 127.0.0.1.
-- **The certificate:** for `demo.pacod.io` and `*.demo.pacod.io`, full chain, in
-  [certs/](certs/README.md). The files there now are self-signed placeholders: the edge starts,
+- **The certificate:** one for `demo.pacod.io`, `*.demo.pacod.io` and `*.pacod-sites.net`, full
+  chain, in [certs/](certs/README.md). The files there now are self-signed placeholders: the edge starts,
   but browsers warn and the products' sign-in fails until the real ones replace them. They
   are not committed.
 - **Ports 80 and 443** free on the server (`DEMO_BIND=0.0.0.0`: every interface).
@@ -89,9 +93,10 @@ Safari may not: use another browser, or add `make hosts`'s lines to `/etc/hosts`
 
 ## Configuration: demo.env and demo.local.env
 
-`demo.env` is the configuration. It sets the domain and ports, the certificate, the first
-administrator's email, the optional component (`DEMO_PROFILES=ingestion`), the models each
-product uses, the embedding backend and the log directory. Run `make up` after a change. Git
+`demo.env` is the configuration. It sets the domains (the stack's and the websites') and ports,
+the certificate, the first administrator's email, the optional component
+(`DEMO_PROFILES=ingestion`), the models each product uses, the embedding backend and the log
+directory. Run `make up` after a change. Git
 ignores it: the first `make` copies it from `demo.env.example`, the committed template; change
 the template only for what every machine should get.
 

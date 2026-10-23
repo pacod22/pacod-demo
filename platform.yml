@@ -76,6 +76,7 @@ services:
       - "${DEMO_BIND}:${DEMO_HTTPS_PORT}:${DEMO_HTTPS_PORT}/udp"
     environment: !override
       DEMO_DOMAIN: ${DEMO_DOMAIN}
+      DEMO_SITE_DOMAIN: ${DEMO_SITE_DOMAIN}
       DEMO_HTTP_PORT: ${DEMO_HTTP_PORT}
       DEMO_HTTPS_PORT: ${DEMO_HTTPS_PORT}
       DEMO_PUBLIC: ${DEMO_PUBLIC}
@@ -131,8 +132,8 @@ services:
           - console.${DEMO_DOMAIN}
           - gw.${DEMO_DOMAIN}
           - studio.${DEMO_DOMAIN}
-          - cms.${DEMO_DOMAIN}
-          - minimal.${DEMO_DOMAIN}
+          - cms.${DEMO_SITE_DOMAIN}
+          - minimal.${DEMO_SITE_DOMAIN}
           - kb.${DEMO_DOMAIN}
           - grafana.${DEMO_DOMAIN}
           - mail.${DEMO_DOMAIN}

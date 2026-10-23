@@ -178,7 +178,9 @@ shots: network render
 
 hosts:
 	@set -a; . ./demo.env; [ ! -f demo.local.env ] || . ./demo.local.env; set +a; \
-	echo "# pacod demo: add to /etc/hosts for browsers that do not resolve *.$$DEMO_DOMAIN"; \
+	sd=$${DEMO_SITE_DOMAIN:-$$DEMO_DOMAIN}; \
+	echo "# pacod demo: add to /etc/hosts for browsers that do not resolve *.$$DEMO_DOMAIN and *.$$sd"; \
 	if [ "$$DEMO_DOMAIN" != localhost ]; then echo "127.0.0.1 $$DEMO_DOMAIN"; fi; \
-	for h in id app chat console gw studio cms minimal kb grafana mail prometheus; do \
-		echo "127.0.0.1 $$h.$$DEMO_DOMAIN"; done
+	for h in id app chat console gw studio kb grafana mail prometheus; do \
+		echo "127.0.0.1 $$h.$$DEMO_DOMAIN"; done; \
+	for h in cms minimal; do echo "127.0.0.1 $$h.$$sd"; done

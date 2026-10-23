@@ -22,6 +22,7 @@ from playwright.sync_api import Page, sync_playwright
 E = os.environ
 OUT = Path("/work/home/screenshots")
 DOMAIN = E["DEMO_DOMAIN"]
+SITE_DOMAIN = E["DEMO_SITE_DOMAIN"]
 
 # (file name, address): what the home page shows for each product.
 SHOTS = [
@@ -72,7 +73,9 @@ def visit(page: Page, url: str) -> None:
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as p:
-        browser = p.chromium.launch(args=[f"--host-resolver-rules=MAP *.{DOMAIN} pacod-caddy"])
+        browser = p.chromium.launch(
+            args=[f"--host-resolver-rules=MAP *.{DOMAIN} pacod-caddy, MAP *.{SITE_DOMAIN} pacod-caddy"]
+        )
         context = browser.new_context(
             viewport={"width": 1280, "height": 800}, color_scheme="light", locale="en-GB"
         )

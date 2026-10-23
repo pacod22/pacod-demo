@@ -62,6 +62,22 @@ esac
 log_level_upper=$(printf %s "$log_level" | tr '[:lower:]' '[:upper:]')
 
 d=$DEMO_DOMAIN
+# The CMS's websites (demo.env's DEMO_SITE_DOMAIN): <id>.<sd>, the demo's cms.<sd> and
+# minimal.<sd>. A website runs its owner's script, so the studio refuses to start when <sd> shares
+# a registrable domain with studio.<d> and id.<d> -- unless it is a public suffix, as localhost is.
+# What can be told here, a domain the same as the other or under it, stops the render instead; the
+# studio checks the rest (another name under the same registrable domain) when it starts.
+sd=${DEMO_SITE_DOMAIN:-$d}
+shared=false
+if [ "$sd" != localhost ] && [ "$d" != localhost ]; then
+	case $sd in "$d" | *."$d") shared=true ;; esac
+	case $d in *."$sd") shared=true ;; esac
+fi
+if [ "$shared" = true ]; then
+	echo "render-env: the CMS's websites (*.$sd) would share the domain of studio.$d and id.$d, and the" \
+		"studio refuses to start then: set DEMO_SITE_DOMAIN in demo.env to a domain of its own (demo.env.example)" >&2
+	exit 1
+fi
 p=$DEMO_HTTP_PORT
 hp=${DEMO_HTTPS_PORT:-443}
 # HTTPS when demo.env names a certificate (certs/): every address is https://, on DEMO_HTTPS_PORT,
@@ -86,6 +102,7 @@ fi
 # The port in addresses: none when it is the scheme's default.
 if [ "$port" = "$default" ]; then url_port=; else url_port=$port; fi
 url() { printf '%s://%s.%s%s' "$scheme" "$1" "$d" "${url_port:+:$url_port}"; }
+site_url() { printf '%s://%s.%s%s' "$scheme" "$1" "$sd" "${url_port:+:$url_port}"; }
 origin=$scheme://$d${url_port:+:$url_port}
 # Published beyond this machine (DEMO_BIND not a loopback address): what is safe on a laptop is
 # closed. The mail viewer (it shows every reset and invitation link), Prometheus and Grafana (a
@@ -144,6 +161,7 @@ fi
 DEMO_HOME=$home
 DEMO_STATE=$state
 DEMO_DOMAIN=$d
+DEMO_SITE_DOMAIN=$sd
 DEMO_HTTP_PORT=$p
 DEMO_HTTPS_PORT=$hp
 DEMO_BIND=$DEMO_BIND
@@ -178,7 +196,7 @@ AP_ORIGIN=$(url app)
 GW_CONSOLE_ORIGIN=$(url console)
 GW_API_ORIGIN=$(url gw)
 CMS_STUDIO_ORIGIN=$(url studio)
-CMS_DEMO_ORIGIN=$(url cms)
+CMS_DEMO_ORIGIN=$(site_url cms)
 KB_ORIGIN=$(url kb)
 GRAFANA_ORIGIN=$(url grafana)
 MAIL_ORIGIN=$(url mail)
@@ -259,10 +277,10 @@ HTTP_PORT=$p
 SPRING_PROFILE=dev
 ID_ISSUER=$(url id)
 STUDIO_ORIGIN=$(url studio)
-PACOD_SITE_DOMAIN=$d
+PACOD_SITE_DOMAIN=$sd
 DEMO_WEBSITES=true
-DEMO_HOSTS=cms.$d
-DEMO_MINIMAL_HOSTS=minimal.$d
+DEMO_HOSTS=cms.$sd
+DEMO_MINIMAL_HOSTS=minimal.$sd
 MONGO_DATA_DIR=cms-mongo-data
 MONGO_BACKUP_DIR=$state/cms/backup
 STORAGE_HOST=$state/cms/storage

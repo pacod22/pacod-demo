@@ -6,8 +6,10 @@
 {
 	# With a certificate in certs/ (demo.env's DEMO_TLS_CERT), disable_certs: HTTPS with that one
 	# certificate, which the home page's block loads (DEMO_TLS) and which then serves every site
-	# whose name it covers (DEMO_DOMAIN and *.DEMO_DOMAIN); nothing is asked of a CA, and plain
-	# HTTP answers with a redirect. Without one, off: plain HTTP only, a local demo.
+	# whose name it covers (DEMO_DOMAIN, *.DEMO_DOMAIN and the websites' *.DEMO_SITE_DOMAIN, whose
+	# catch-all has no tls directive either); nothing is asked of a CA, and plain HTTP answers with
+	# a redirect. Without one, off: plain HTTP only, a local demo. A second certificate cannot go on
+	# the catch-all: its tls directive would pin that one for every host without a tls of its own.
 	auto_https {$DEMO_AUTO_HTTPS}
 	http_port {$DEMO_HTTP_PORT}
 	https_port {$DEMO_HTTPS_PORT}
