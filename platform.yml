@@ -100,6 +100,14 @@ services:
       CMS_STUDIO_SITE: ${CMS_STUDIO_SITE}
       CMS_PUBLIC_SITE: ${CMS_PUBLIC_SITE}
       KB_SITE: ${KB_SITE}
+      # The request logs (docs/LOGGING.md): the demo's own sites and pacod-ap's (AP_SITE_OPTIONS
+      # imports config/Caddyfile's demo_access_log), and each product fragment's format.
+      AP_SITE_OPTIONS: ${AP_SITE_OPTIONS}
+      DEMO_CADDY_LOG_FORMAT: ${DEMO_CADDY_LOG_FORMAT}
+      ID_CADDY_LOG_FORMAT: ${ID_CADDY_LOG_FORMAT}
+      PGW_CADDY_LOG_FORMAT: ${PGW_CADDY_LOG_FORMAT}
+      CMS_CADDY_LOG_FORMAT: ${CMS_CADDY_LOG_FORMAT}
+      KB_CADDY_LOG_FORMAT: ${KB_CADDY_LOG_FORMAT}
     volumes: !override
       - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
       - ../pacod-id/platform/caddy/id.caddy:/etc/caddy/sites/id.caddy:ro

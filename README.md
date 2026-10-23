@@ -112,6 +112,13 @@ Docker.
 **The embedding backend is fixed at the first `make up`**: the stored vectors depend on it, so
 switching between `bge` and `hash` later needs `make clean`.
 
+**Logs.** Every product logs the same way ([docs/LOGGING.md](docs/LOGGING.md)): one event per line
+on its container's output (`make logs S=<service>`), with the same keys everywhere (`timestamp`,
+`level`, `service`, `logger`, `message`), and Docker keeps 5 files of 10 MB per container.
+`DEMO_LOG_LEVEL` (`debug`, `info`, `warn`, `error`) and `DEMO_LOG_FORMAT` (`text` to read,
+`json` for a log collector) set every product and the edge's request log; `DEMO_LOG_DIR` is where
+the app and the CMS also write JSON log files.
+
 **LLM providers.** With no key set, every model call goes to the gateway's mock provider: the
 demo runs offline and `make verify` is deterministic, but chat answers are canned. Set
 `ANTHROPIC_API_KEY` (the app's default models are Anthropic's) and others as you like in

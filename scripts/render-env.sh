@@ -43,6 +43,23 @@ if ! (umask 022 && mkdir -p "$log_dir/cms" "$ap_logs/api" "$ap_logs/admin-api" "
 	echo "render-env: cannot create the log directories under $log_dir (DEMO_LOG_DIR)" >&2
 	exit 1
 fi
+# The level and format of every product (demo.env's DEMO_LOG_LEVEL and DEMO_LOG_FORMAT,
+# docs/LOGGING.md), written below in each product's own variables and spelling.
+log_level=$(printf %s "${DEMO_LOG_LEVEL:-info}" | tr '[:upper:]' '[:lower:]')
+case $log_level in
+	warning) log_level=warn ;;
+	debug | info | warn | error) ;;
+	*) echo "render-env: DEMO_LOG_LEVEL=$DEMO_LOG_LEVEL is not a level: debug, info, warn or error" >&2; exit 1 ;;
+esac
+log_format=$(printf %s "${DEMO_LOG_FORMAT:-text}" | tr '[:upper:]' '[:lower:]')
+case $log_format in
+	json) caddy_log_format=json ;;
+	# Caddy's name for its readable format.
+	text) caddy_log_format=console ;;
+	*) echo "render-env: DEMO_LOG_FORMAT=$DEMO_LOG_FORMAT is not a format: text or json" >&2; exit 1 ;;
+esac
+# Python's spelling (pacod-ap's APP_LOG_LEVEL).
+log_level_upper=$(printf %s "$log_level" | tr '[:lower:]' '[:upper:]')
 
 d=$DEMO_DOMAIN
 p=$DEMO_HTTP_PORT
@@ -143,6 +160,17 @@ TORCH_NUM_THREADS=$TORCH_NUM_THREADS
 CMS_AI_MODEL=$CMS_AI_MODEL
 # The log files' directory on this machine (overlays/ap.yml, cms's LOG_DIR_HOST).
 DEMO_LOG_DIR=$log_dir
+# Every product's log level and format (docs/LOGGING.md); the product files below spell them out.
+DEMO_LOG_LEVEL=$log_level
+DEMO_LOG_FORMAT=$log_format
+# The edge's request logs: the demo's sites (config/Caddyfile), pacod-ap's site (AP_SITE_OPTIONS,
+# the demo's access log), and the products' fragments, each with its own variable.
+DEMO_CADDY_LOG_FORMAT=$caddy_log_format
+ID_CADDY_LOG_FORMAT=$caddy_log_format
+PGW_CADDY_LOG_FORMAT=$caddy_log_format
+CMS_CADDY_LOG_FORMAT=$caddy_log_format
+KB_CADDY_LOG_FORMAT=$caddy_log_format
+AP_SITE_OPTIONS='import demo_access_log'
 
 # The public addresses, all through pacod-caddy.
 PACOD_ID_ISSUER=$(url id)
@@ -193,6 +221,8 @@ PID_BOOTSTRAP_ADMIN_REALM=pacod
 PID_BOOTSTRAP_ADMIN_ROLES=id.admin,pacod.superuser,pacod.admin,gw.platform_admin,cms.platform_admin,kb.admin
 PID_EMAIL_FROM_ADDRESS=id@$d
 PID_EMAIL_FROM_NAME=pacod (demo)
+PID_LOG=$log_level,sqlx=warn
+PID_LOG_FORMAT=$log_format
 EOF
 
 cat > "$state/env/id.container.env" <<EOF
@@ -218,7 +248,9 @@ EOF
 # ---- pacod-gw ---------------------------------------------------------------------------------
 cat > "$state/env/gw.env" <<EOF
 PGW_AUTH=oidc
-RUST_LOG=info
+RUST_LOG=$log_level
+PGW_LOG_FORMAT=$log_format
+TESTER_LOG_LEVEL=$log_level
 EOF
 
 # ---- pacod-cms --------------------------------------------------------------------------------
@@ -235,6 +267,8 @@ MONGO_DATA_DIR=cms-mongo-data
 MONGO_BACKUP_DIR=$state/cms/backup
 STORAGE_HOST=$state/cms/storage
 LOG_DIR_HOST=$log_dir/cms
+APP_LOG_LEVEL=$log_level
+APP_LOG_FORMAT=$log_format
 PACOD_GW_API_KEY=${CMS_GW_KEY:-}
 PACOD_AI_MODEL=$CMS_AI_MODEL
 PACOD_ID_PROVISIONER_TOKEN=${PACOD_ID_PROVISIONER_TOKEN:-}
@@ -254,6 +288,8 @@ PACOD_GW_API_KEY=${KB_GW_KEY:-}
 LLM_CONVERTER_ENABLED=false
 LLM_CONVERTER_MODEL=$KB_LLM_MODEL
 CONTENT_SECURITY_LLM_MODEL=$KB_LLM_MODEL
+LOG_LEVEL=$log_level
+LOG_FORMAT=$log_format
 EOF
 
 # ---- pacod-ap ---------------------------------------------------------------------------------
@@ -268,6 +304,11 @@ LOCAL_PACOD_SITE_URL=$(url app)
 LOCAL_PACOD_SITE_INDEXING_ENABLED=false
 LOCAL_CRAWLER_VERIFY_ENABLED=false
 LOCAL_EMBEDDINGS_BACKEND=$EMBEDDINGS_BACKEND
+# The frontend's (its compose environment is a fixed list) and the services' without an env_file.
+FRONTEND_LOG_LEVEL=$log_level
+FRONTEND_LOG_FORMAT=$log_format
+APP_LOG_LEVEL=$log_level_upper
+APP_LOG_FORMAT=$log_format
 EOF
 
 # The containers' side: the app's own .env.example as the base (every setting it documents, with
@@ -285,7 +326,8 @@ APP_ENV=development
 # Dev tokens (dev-token-<user>) let \`make verify\` run a chat turn without a browser. They need no
 # password, so only a demo kept on this machine (DEMO_BIND a loopback address) has them.
 AUTH_ALLOW_DEV_TOKENS=$([ "$public" = true ] && echo false || echo true)
-APP_LOG_LEVEL=INFO
+APP_LOG_LEVEL=$log_level_upper
+APP_LOG_FORMAT=$log_format
 APP_SECRETS_KEY=$APP_SECRETS_KEY
 AGENT_PRIMARY_MODEL=$AP_PRIMARY_MODEL
 AGENT_CLASSIFIER_MODEL=$AP_CLASSIFIER_MODEL

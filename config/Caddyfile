@@ -16,6 +16,31 @@
 		# Per-host request metrics for Prometheus (job "caddy", scraped on :9180 below).
 		metrics
 	}
+	# Caddy's own messages (a failed proxy request includes the request), in the demo's log
+	# format (demo.env's DEMO_LOG_FORMAT: console is Caddy's text), with what a request may carry
+	# that must not be logged left out (docs/LOGGING.md, section 6).
+	log default {
+		output stdout
+		format filter {
+			wrap {$DEMO_CADDY_LOG_FORMAT:console}
+			fields {
+				request>uri query {
+					delete token
+					delete code
+					delete state
+					delete next
+					delete flow
+					delete id_token_hint
+					delete login_hint
+					delete key
+				}
+				request>headers>Referer delete
+				request>headers>X-Api-Key delete
+				request>headers>X-Goog-Api-Key delete
+				resp_headers>Location delete
+			}
+		}
+	}
 }
 
 # The admin's sign-in in front of a site, on a demo published beyond this machine: DEMO_PRIVATE is
@@ -29,6 +54,34 @@
 	request_header -Authorization
 }
 
+# The request log of a site that has none of its own: the demo's sites below and pacod-ap's
+# (AP_SITE_OPTIONS). The same format and redaction as the global log above. Defined before the
+# products' sites are imported, which use it.
+(demo_access_log) {
+	log {
+		output stdout
+		format filter {
+			wrap {$DEMO_CADDY_LOG_FORMAT:console}
+			fields {
+				request>uri query {
+					delete token
+					delete code
+					delete state
+					delete next
+					delete flow
+					delete id_token_hint
+					delete login_hint
+					delete key
+				}
+				request>headers>Referer delete
+				request>headers>X-Api-Key delete
+				request>headers>X-Goog-Api-Key delete
+				resp_headers>Location delete
+			}
+		}
+	}
+}
+
 import /etc/caddy/sites/*.caddy
 
 # The demo's home page (home/): every product, what it is, its admin and its websites. A template:
@@ -36,6 +89,7 @@ import /etc/caddy/sites/*.caddy
 # this block, so it wins over pacod-cms's catch-all (every host no other block names).
 {$DEMO_HOME_SITE} {
 	{$DEMO_TLS}
+	import demo_access_log
 	root * /srv/home
 	templates
 	file_server
@@ -45,18 +99,21 @@ import /etc/caddy/sites/*.caddy
 # admin's sign-in too: a viewer can query Prometheus through it.
 {$GRAFANA_SITE} {
 	{$DEMO_PRIVATE}
+	import demo_access_log
 	reverse_proxy pacod-grafana:3000
 }
 
 # The mail sink: every mail the stack sends (invitations, confirmations, reset links) ends here.
 {$MAIL_SITE} {
 	{$DEMO_PRIVATE}
+	import demo_access_log
 	reverse_proxy pacod-mailpit:8025
 }
 
 # Prometheus, for ad-hoc queries.
 {$PROMETHEUS_SITE} {
 	{$DEMO_PRIVATE}
+	import demo_access_log
 	reverse_proxy pacod-prometheus:9090
 }
 

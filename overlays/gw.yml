@@ -36,7 +36,6 @@ services:
       PGW_CONSOLE_URL: ${GW_CONSOLE_ORIGIN}
       PGW_ID_ISSUER: ${PACOD_ID_ISSUER}
       PGW_ID_CLIENT_SECRET: ${PGW_ID_CLIENT_SECRET}
-      PGW_LOG_FORMAT: text
     depends_on:
       pacod-id:
         condition: service_healthy
