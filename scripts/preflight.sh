@@ -1,7 +1,7 @@
 #!/bin/sh
 # Checks the machine before `make up`: Docker and Compose, memory and disk, the five sibling
-# repositories (on the shared-network layout), the HTTPS certificate, the demo's ports, and that
-# no other pacod stack holds the shared container names. Prints what it finds; exits 1 on a
+# repositories (on the shared-network layout), that no other pacod stack holds the shared
+# container names, the admin password's length, the HTTPS certificate and the demo's ports. Prints what it finds; exits 1 on a
 # blocking problem.
 set -eu
 cd "$(dirname "$0")/.."
@@ -67,6 +67,17 @@ if [ -n "$others" ]; then
 	bad "other pacod containers are running; stop their stacks first: $(echo "$others" | tr '\n' ' ')"
 else
 	ok "no other pacod stack is running"
+fi
+
+# The admin's password (demo.local.env): pacod-id refuses a role holder's shorter than 12
+# characters and stops at every start. Left empty, `make up` generates one of 24.
+pw=${DEMO_ADMIN_PASSWORD:-}
+if [ -z "$pw" ]; then
+	ok "admin password: generated (make urls shows it)"
+elif [ "${#pw}" -lt 12 ]; then
+	bad "DEMO_ADMIN_PASSWORD has ${#pw} characters; pacod-id needs 12 or more (demo.local.env)"
+else
+	ok "admin password: ${#pw} characters"
 fi
 
 # HTTPS: the certificate and key demo.env names, in certs/ (certs/README.md).
