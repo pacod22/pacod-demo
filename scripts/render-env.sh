@@ -16,7 +16,7 @@ set -eu
 cd "$(dirname "$0")/.."
 home=$(pwd)
 state=$home/.state
-mkdir -p "$state/env" "$state/cms/storage" "$state/cms/logs" "$state/cms/backup"
+mkdir -p "$state/env" "$state/cms/storage" "$state/cms/backup"
 umask 077
 
 [ -f "$state/secrets.env" ] || { echo "render-env: .state/secrets.env is missing; run make init" >&2; exit 1; }
@@ -29,6 +29,20 @@ if [ -f ./demo.local.env ]; then . ./demo.local.env; fi
 . "$state/secrets.env"
 . "$state/bootstrap.env"
 set +a
+
+# The log files (demo.env's DEMO_LOG_DIR), one directory per service. Absolute: a relative bind
+# source in an included compose file is read against that file's directory, not pacod-demo. Made
+# here, by the user who runs make, so that Docker does not create them as root (and `make clean`
+# can delete them).
+log_dir=${DEMO_LOG_DIR:-$state/logs}
+case $log_dir in /*) ;; *) log_dir=$home/$log_dir ;; esac
+ap_logs=$log_dir/ap
+if ! (umask 022 && mkdir -p "$log_dir/cms" "$ap_logs/api" "$ap_logs/admin-api" "$ap_logs/ingestion" \
+	"$ap_logs/ingestion-cpu" "$ap_logs/improvement-loop" "$ap_logs/improvement-loop-worker" \
+	"$ap_logs/newsletter-worker" 2>/dev/null); then
+	echo "render-env: cannot create the log directories under $log_dir (DEMO_LOG_DIR)" >&2
+	exit 1
+fi
 
 d=$DEMO_DOMAIN
 p=$DEMO_HTTP_PORT
@@ -127,6 +141,8 @@ DEMO_PROFILES=$DEMO_PROFILES
 EMBEDDINGS_BACKEND=$EMBEDDINGS_BACKEND
 TORCH_NUM_THREADS=$TORCH_NUM_THREADS
 CMS_AI_MODEL=$CMS_AI_MODEL
+# The log files' directory on this machine (overlays/ap.yml, cms's LOG_DIR_HOST).
+DEMO_LOG_DIR=$log_dir
 
 # The public addresses, all through pacod-caddy.
 PACOD_ID_ISSUER=$(url id)
@@ -218,7 +234,7 @@ DEMO_MINIMAL_HOSTS=minimal.$d
 MONGO_DATA_DIR=cms-mongo-data
 MONGO_BACKUP_DIR=$state/cms/backup
 STORAGE_HOST=$state/cms/storage
-LOG_DIR_HOST=$state/cms/logs
+LOG_DIR_HOST=$log_dir/cms
 PACOD_GW_API_KEY=${CMS_GW_KEY:-}
 PACOD_AI_MODEL=$CMS_AI_MODEL
 PACOD_ID_PROVISIONER_TOKEN=${PACOD_ID_PROVISIONER_TOKEN:-}

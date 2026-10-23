@@ -1,32 +1,50 @@
 # Adapts pacod-ap's app file and its laptop overlay (../pacod-ap/pacod-api/docker-compose.yml,
-# docker-compose.local.yml: CPU-only torch, log volumes instead of /data paths) to the full stack:
-# the demo's container settings (.state/env/ap.container.env, built from the app's own
-# .env.example) instead of the checkout's .env, the shared embeddings service on the shared model
-# cache, and no published ports (the edge serves the app).
+# docker-compose.local.yml: CPU-only torch) to the full stack: the demo's container settings
+# (.state/env/ap.container.env, built from the app's own .env.example) instead of the checkout's
+# .env, the log files in demo.env's DEMO_LOG_DIR (<dir>/ap/<service>, where production has
+# /data/logs/<service>) instead of the laptop overlay's volumes, the shared embeddings service on
+# the shared model cache, and no published ports (the edge serves the app).
+#
+# The log mounts replace the laptop overlay's by their container path (/srv/logs); the services'
+# other volumes stay.
 services:
   ap-api:
     env_file: !override
       - ${DEMO_STATE}/env/ap.container.env
+    volumes:
+      - ${DEMO_LOG_DIR}/ap/api:/srv/logs
     ports: !reset []
   ap-admin-api:
     env_file: !override
       - ${DEMO_STATE}/env/ap.container.env
+    volumes:
+      - ${DEMO_LOG_DIR}/ap/admin-api:/srv/logs
     ports: !reset []
   ap-ingestion:
     env_file: !override
       - ${DEMO_STATE}/env/ap.container.env
+    volumes:
+      - ${DEMO_LOG_DIR}/ap/ingestion:/srv/logs
   ap-ingestion-cpu:
     env_file: !override
       - ${DEMO_STATE}/env/ap.container.env
+    volumes:
+      - ${DEMO_LOG_DIR}/ap/ingestion-cpu:/srv/logs
   ap-improvement-loop:
     env_file: !override
       - ${DEMO_STATE}/env/ap.container.env
+    volumes:
+      - ${DEMO_LOG_DIR}/ap/improvement-loop:/srv/logs
   ap-improvement-loop-worker:
     env_file: !override
       - ${DEMO_STATE}/env/ap.container.env
+    volumes:
+      - ${DEMO_LOG_DIR}/ap/improvement-loop-worker:/srv/logs
   ap-newsletter-worker:
     env_file: !override
       - ${DEMO_STATE}/env/ap.container.env
+    volumes:
+      - ${DEMO_LOG_DIR}/ap/newsletter-worker:/srv/logs
   ap-mcp:
     env_file: !override
       - ${DEMO_STATE}/env/ap.container.env
