@@ -160,6 +160,7 @@ urls: render
 	echo "  Gateway API (OpenAI)        $$GW_API_ORIGIN/v1"; \
 	echo "  CMS studio (pacod-cms)      $$CMS_STUDIO_ORIGIN"; \
 	echo "  CMS demo website            $$CMS_DEMO_ORIGIN"; \
+	echo "  CMS minimal website         $$CMS_MINIMAL_ORIGIN"; \
 	echo "  Knowledge base (pacod-kb)   $$KB_ORIGIN"; \
 	echo "  Identity (pacod-id)         $$PACOD_ID_ISSUER/admin"; \
 	echo "  Grafana                     $$GRAFANA_ORIGIN"; \
@@ -181,6 +182,6 @@ hosts:
 	sd=$${DEMO_SITE_DOMAIN:-$$DEMO_DOMAIN}; \
 	echo "# pacod demo: add to /etc/hosts for browsers that do not resolve *.$$DEMO_DOMAIN and *.$$sd"; \
 	if [ "$$DEMO_DOMAIN" != localhost ]; then echo "127.0.0.1 $$DEMO_DOMAIN"; fi; \
-	for h in id app chat console gw studio kb grafana mail prometheus; do \
+	for h in id app chat console gw $${DEMO_STUDIO_SUBDOMAIN:-studio} kb grafana mail prometheus; do \
 		echo "127.0.0.1 $$h.$$DEMO_DOMAIN"; done; \
-	for h in cms minimal; do echo "127.0.0.1 $$h.$$sd"; done
+	for h in $${DEMO_CMS_SUBDOMAIN:-cms} $${DEMO_CMS_MINIMAL_SUBDOMAIN:-minimal}; do echo "127.0.0.1 $$h.$$sd"; done

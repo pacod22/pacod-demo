@@ -62,21 +62,69 @@ esac
 log_level_upper=$(printf %s "$log_level" | tr '[:lower:]' '[:upper:]')
 
 d=$DEMO_DOMAIN
-# The CMS's websites (demo.env's DEMO_SITE_DOMAIN): <id>.<sd>, the demo's cms.<sd> and
-# minimal.<sd>. A website runs its owner's script, so the studio refuses to start when <sd> shares
-# a registrable domain with studio.<d> and id.<d> -- unless it is a public suffix, as localhost is.
-# What can be told here, a domain the same as the other or under it, stops the render instead; the
-# studio checks the rest (another name under the same registrable domain) when it starts.
+# The CMS's subdomains (demo.env): the studio's under DEMO_DOMAIN, the two demo websites' under
+# DEMO_SITE_DOMAIN. One DNS label each.
+studio=${DEMO_STUDIO_SUBDOMAIN:-studio}
+cms=${DEMO_CMS_SUBDOMAIN:-cms}
+minimal=${DEMO_CMS_MINIMAL_SUBDOMAIN:-minimal}
+for pair in "DEMO_STUDIO_SUBDOMAIN=$studio" "DEMO_CMS_SUBDOMAIN=$cms" "DEMO_CMS_MINIMAL_SUBDOMAIN=$minimal"; do
+	case ${pair#*=} in
+		*[!a-z0-9-]* | -* | *-) echo "render-env: $pair is not a subdomain: lowercase letters, digits and inner hyphens" >&2; exit 1 ;;
+	esac
+done
+[ "$cms" != "$minimal" ] || { echo "render-env: DEMO_CMS_SUBDOMAIN and DEMO_CMS_MINIMAL_SUBDOMAIN are both $cms" >&2; exit 1; }
+# The studio sits beside the other products under DEMO_DOMAIN: never on one of their subdomains.
+for taken in id app chat console gw kb grafana mail prometheus; do
+	[ "$studio" != "$taken" ] || {
+		echo "render-env: DEMO_STUDIO_SUBDOMAIN=$studio is already the edge's ($taken.$DEMO_DOMAIN): choose another" >&2
+		exit 1
+	}
+done
+# The CMS's websites (demo.env's DEMO_SITE_DOMAIN): <id>.<sd>, the demo's <cms>.<sd> and
+# <minimal>.<sd>. A website runs its owner's script, so the studio refuses to start when <sd> shares
+# a registrable domain with <studio>.<d> and id.<d> -- unless it is a public suffix, as localhost
+# is, or DEMO_SITE_DOMAIN_SHARED=true accepts the risk. What can be told here, a domain the same as
+# the other or under it, stops the render instead; the studio checks the rest (another name under
+# the same registrable domain) when it starts.
 sd=${DEMO_SITE_DOMAIN:-$d}
+site_domain_shared=${DEMO_SITE_DOMAIN_SHARED:-false}
+case $site_domain_shared in
+	true | false) ;;
+	*) echo "render-env: DEMO_SITE_DOMAIN_SHARED=$site_domain_shared is not true or false" >&2; exit 1 ;;
+esac
 shared=false
 if [ "$sd" != localhost ] && [ "$d" != localhost ]; then
 	case $sd in "$d" | *."$d") shared=true ;; esac
 	case $d in *."$sd") shared=true ;; esac
 fi
-if [ "$shared" = true ]; then
-	echo "render-env: the CMS's websites (*.$sd) would share the domain of studio.$d and id.$d, and the" \
-		"studio refuses to start then: set DEMO_SITE_DOMAIN in demo.env to a domain of its own (demo.env.example)" >&2
+if [ "$shared" = true ] && [ "$site_domain_shared" != true ]; then
+	echo "render-env: the CMS's websites (*.$sd) would share the domain of $studio.$d and id.$d, and the" \
+		"studio refuses to start then: set DEMO_SITE_DOMAIN in demo.env to a domain of its own, or" \
+		"DEMO_SITE_DOMAIN_SHARED=true to accept that (demo.env.example)" >&2
 	exit 1
+fi
+if [ "$site_domain_shared" = true ] && [ "$d" != localhost ]; then
+	# Shared on purpose: only over HTTPS, where the studio's and pacod-id's cookies are __Host-
+	# cookies a website's script cannot set.
+	if [ -z "${DEMO_TLS_CERT:-}${DEMO_TLS_KEY:-}" ]; then
+		echo "render-env: DEMO_SITE_DOMAIN_SHARED=true needs HTTPS (DEMO_TLS_CERT, DEMO_TLS_KEY): over plain HTTP" \
+			"the websites could set the cookies the studio and the sign-in receive" >&2
+		exit 1
+	fi
+fi
+# On the very domain (localhost's default, or shared on purpose), a website's subdomain must not be
+# one the edge already routes: Caddy's own site would hide the website, and the demo websites are
+# created at these hosts unchecked.
+if [ "$sd" = "$d" ]; then
+	for h in "$cms" "$minimal"; do
+		for taken in "$studio" id app chat console gw kb grafana mail prometheus; do
+			[ "$h" != "$taken" ] || {
+				echo "render-env: the CMS website subdomain $h.$d is already the edge's ($taken):" \
+					"choose another DEMO_CMS_SUBDOMAIN or DEMO_CMS_MINIMAL_SUBDOMAIN" >&2
+				exit 1
+			}
+		done
+	done
 fi
 p=$DEMO_HTTP_PORT
 hp=${DEMO_HTTPS_PORT:-443}
@@ -98,6 +146,11 @@ else
 	scheme=http port=$p default=80
 	auto_https=off
 	tls=
+fi
+if [ "$scheme" = https ]; then
+	cms_host_cookies=true cms_session_cookie=__Host-studio-session
+else
+	cms_host_cookies=false cms_session_cookie=JSESSIONID
 fi
 # The port in addresses: none when it is the scheme's default.
 if [ "$port" = "$default" ]; then url_port=; else url_port=$port; fi
@@ -195,8 +248,9 @@ PACOD_ID_ISSUER=$(url id)
 AP_ORIGIN=$(url app)
 GW_CONSOLE_ORIGIN=$(url console)
 GW_API_ORIGIN=$(url gw)
-CMS_STUDIO_ORIGIN=$(url studio)
-CMS_DEMO_ORIGIN=$(site_url cms)
+CMS_STUDIO_ORIGIN=$(url "$studio")
+CMS_DEMO_ORIGIN=$(site_url "$cms")
+CMS_MINIMAL_ORIGIN=$(site_url "$minimal")
 KB_ORIGIN=$(url kb)
 GRAFANA_ORIGIN=$(url grafana)
 MAIL_ORIGIN=$(url mail)
@@ -207,8 +261,16 @@ ID_SITE=$(url id)
 AP_SITE=$(url app)
 GW_CONSOLE_SITE=$(url console)
 GW_API_SITE=$(url gw)
-CMS_STUDIO_SITE=$(url studio)
+CMS_STUDIO_SITE=$(url "$studio")
 CMS_PUBLIC_SITE=$scheme://:$port
+# The CMS's hosts, for the edge's network aliases (platform.yml) and make hosts.
+CMS_STUDIO_HOST=$studio.$d
+CMS_DEMO_HOST=$cms.$sd
+CMS_MINIMAL_HOST=$minimal.$sd
+# The studio's cookies: __Host- ones over HTTPS, which no other host can set (the dev profile the
+# demo runs leaves them plain; overlays/cms.yml).
+CMS_HOST_COOKIES=$cms_host_cookies
+CMS_SESSION_COOKIE=$cms_session_cookie
 KB_SITE=$(url kb)
 
 # The demo's own sites (config/Caddyfile). Quoted where a value has spaces or \$: compose reads
@@ -250,7 +312,7 @@ PID_BOOTSTRAP_ADMIN_PASSWORD=$admin_password
 PACOD_ID_ISSUER=$(url id)
 AP_ORIGIN=$(url app)
 GW_CONSOLE_ORIGIN=$(url console)
-CMS_STUDIO_ORIGIN=$(url studio)
+CMS_STUDIO_ORIGIN=$(url "$studio")
 KB_ORIGIN=$(url kb)
 PACOD_WEB_CLIENT_SECRET=$PACOD_WEB_CLIENT_SECRET
 PACOD_API_CLIENT_SECRET=$PACOD_API_CLIENT_SECRET
@@ -276,11 +338,12 @@ cat > "$state/env/cms.env" <<EOF
 HTTP_PORT=$p
 SPRING_PROFILE=dev
 ID_ISSUER=$(url id)
-STUDIO_ORIGIN=$(url studio)
+STUDIO_ORIGIN=$(url "$studio")
 PACOD_SITE_DOMAIN=$sd
+PACOD_SITE_DOMAIN_SHARED=$site_domain_shared
 DEMO_WEBSITES=true
-DEMO_HOSTS=cms.$sd
-DEMO_MINIMAL_HOSTS=minimal.$sd
+DEMO_HOSTS=$cms.$sd
+DEMO_MINIMAL_HOSTS=$minimal.$sd
 MONGO_DATA_DIR=cms-mongo-data
 MONGO_BACKUP_DIR=$state/cms/backup
 STORAGE_HOST=$state/cms/storage

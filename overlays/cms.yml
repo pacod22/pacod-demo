@@ -21,6 +21,14 @@ services:
     environment:
       SITE_PUBLIC_SCHEME: ${DEMO_URL_SCHEME}
       SITE_PUBLIC_PORT: ${DEMO_URL_PORT}
+      # Over HTTPS the studio's two cookies are __Host- ones, as in pacod-cms's prod profile
+      # (application-prod.properties): no other host -- a website on a sibling subdomain included
+      # (DEMO_SITE_DOMAIN_SHARED) -- can set them. The dev profile the demo runs leaves them plain.
+      PACOD_STUDIO_HOST_COOKIES: ${CMS_HOST_COOKIES}
+      SERVER_SERVLET_SESSION_COOKIE_NAME: ${CMS_SESSION_COOKIE}
+      SERVER_SERVLET_SESSION_COOKIE_SECURE: ${CMS_HOST_COOKIES}
+      SERVER_SERVLET_SESSION_COOKIE_PATH: /
+      SERVER_SERVLET_SESSION_COOKIE_SAME_SITE: lax
     depends_on:
       pacod-id:
         condition: service_healthy

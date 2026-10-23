@@ -100,7 +100,7 @@ if [ -n "$cert$key" ]; then
 	# The one certificate serves every site: the stack's (*.DEMO_DOMAIN) and the websites'
 	# (*.DEMO_SITE_DOMAIN).
 	if [ -f "certs/$cert" ] && command -v openssl >/dev/null; then
-		for h in "studio.$DEMO_DOMAIN" "cms.${DEMO_SITE_DOMAIN:-$DEMO_DOMAIN}"; do
+		for h in "${DEMO_STUDIO_SUBDOMAIN:-studio}.$DEMO_DOMAIN" "${DEMO_CMS_SUBDOMAIN:-cms}.${DEMO_SITE_DOMAIN:-$DEMO_DOMAIN}"; do
 			openssl x509 -noout -checkhost "$h" -in "certs/$cert" 2>/dev/null | grep -q 'does match' ||
 				warn "certs/$cert does not cover $h: browsers refuse it there (certs/README.md)"
 		done

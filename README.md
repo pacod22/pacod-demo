@@ -46,8 +46,8 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 | https://app.demo.pacod.io | the agent platform (pacod-ap): chat and its admin console |
 | https://console.demo.pacod.io | the gateway console (pacod-gw): providers, models, keys, usage |
 | https://gw.demo.pacod.io/v1 | the gateway's OpenAI-compatible API |
-| https://studio.demo.pacod.io | the CMS studio (pacod-cms) |
-| https://cms.pacod-sites.net | a CMS demo website (also minimal.pacod-sites.net): the websites have a domain of their own, `DEMO_SITE_DOMAIN` (below) |
+| https://studio.demo.pacod.io | the CMS studio (pacod-cms; `DEMO_STUDIO_SUBDOMAIN`) |
+| https://cms.pacod-sites.net | a CMS demo website (also minimal.pacod-sites.net): the websites have a domain of their own, `DEMO_SITE_DOMAIN` (below), or with `DEMO_SITE_DOMAIN_SHARED=true` the demo's, cms.demo.pacod.io; the subdomains are `DEMO_CMS_SUBDOMAIN` and `DEMO_CMS_MINIMAL_SUBDOMAIN` |
 | https://kb.demo.pacod.io | the knowledge base (pacod-kb) |
 | https://id.demo.pacod.io/admin | identity administration (pacod-id) |
 | https://grafana.demo.pacod.io | dashboards of every product |
@@ -67,6 +67,9 @@ needs:
   (`pacod-sites.net` in these examples; not `sites.pacod.io`). A website runs its owner's
   script, which on the studio's registrable domain could set cookies the studio and the sign-in
   receive: the studio refuses to start then, and `make up` stops before it when it can tell.
+  Or `DEMO_SITE_DOMAIN_SHARED=true`, for a demo whose websites are all trusted: the websites then
+  answer under `DEMO_DOMAIN` itself (`cms.demo.pacod.io`), the studio starts with a warning, and
+  the certificate and DNS need no other name. Over HTTPS only (demo.env.example says what it costs).
 - **DNS:** `demo.pacod.io`, `*.demo.pacod.io` and `*.pacod-sites.net` pointing at the server.
   Before the DNS is set, `make hosts` prints `/etc/hosts` lines to try it: as they are on the server itself; on another
   machine, with the server's address instead of 127.0.0.1.
