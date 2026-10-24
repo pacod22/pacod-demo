@@ -100,10 +100,11 @@ services:
       PGW_ADMIN_ALLOW_CIDRS: ${DEMO_ADMIN_ALLOW_CIDRS}
       CMS_STUDIO_SITE: ${CMS_STUDIO_SITE}
       CMS_PUBLIC_SITE: ${CMS_PUBLIC_SITE}
-      # The home page's links to the studio and the two demo websites (their subdomains are demo.env's).
+      # The home page's links to the studio and the three demo websites (their subdomains are demo.env's).
       CMS_STUDIO_HOST: ${CMS_STUDIO_HOST}
       CMS_DEMO_HOST: ${CMS_DEMO_HOST}
       CMS_MINIMAL_HOST: ${CMS_MINIMAL_HOST}
+      CMS_SPACE_HOST: ${CMS_SPACE_HOST}
       KB_SITE: ${KB_SITE}
       # The request logs (docs/LOGGING.md): the demo's own sites and pacod-ap's (AP_SITE_OPTIONS
       # imports config/Caddyfile's demo_access_log), and each product fragment's format.
@@ -138,6 +139,7 @@ services:
           - ${CMS_STUDIO_HOST}
           - ${CMS_DEMO_HOST}
           - ${CMS_MINIMAL_HOST}
+          - ${CMS_SPACE_HOST}
           - kb.${DEMO_DOMAIN}
           - grafana.${DEMO_DOMAIN}
           - mail.${DEMO_DOMAIN}

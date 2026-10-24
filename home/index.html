@@ -2,7 +2,7 @@
 {{- /* A Caddy template (config/Caddyfile): every address is made from the demo's domain (the
 	CMS's: its hosts, from demo.env's subdomains and DEMO_SITE_DOMAIN), scheme and port (no port
 	when it is the scheme's default). */ -}}
-{{- $d := env "DEMO_DOMAIN" }}{{ $studio := env "CMS_STUDIO_HOST" }}{{ $cms := env "CMS_DEMO_HOST" }}{{ $minimal := env "CMS_MINIMAL_HOST" }}{{ $s := env "DEMO_URL_SCHEME" }}{{ $p := "" }}{{ with env "DEMO_URL_PORT" }}{{ $p = printf ":%s" . }}{{ end }}
+{{- $d := env "DEMO_DOMAIN" }}{{ $studio := env "CMS_STUDIO_HOST" }}{{ $cms := env "CMS_DEMO_HOST" }}{{ $minimal := env "CMS_MINIMAL_HOST" }}{{ $space := env "CMS_SPACE_HOST" }}{{ $s := env "DEMO_URL_SCHEME" }}{{ $p := "" }}{{ with env "DEMO_URL_PORT" }}{{ $p = printf ":%s" . }}{{ end }}
 {{- $email := env "DEMO_ADMIN_EMAIL" }}{{ $public := eq (env "DEMO_PUBLIC") "true" }}
 <html lang="en">
 <head>
@@ -317,7 +317,7 @@
 					<div class="head"><span class="badge">CM</span><h3>pacod-cms</h3></div>
 					<div class="role">Content management</div>
 					<p>A CMS for editorial websites: articles, authors and categories, standing pages, an image library, advertising with an HTML5 banner builder, PDFs and journal issues, statistics, and multilingual content with AI translation. One installation hosts many websites, each with its own database, files and cache.</p>
-					<p>The demo has two websites: <em>Demo Journal</em> and <em>Demo Notes</em>.</p>
+					<p>The demo has three websites: <em>Demo Journal</em>, <em>Demo Notes</em> and <em>Starward</em>, a space-travel magazine for an invented star system.</p>
 					<ul class="stack"><li>Java 25</li><li>Spring Boot</li><li>Thymeleaf</li><li>MongoDB</li><li>Gotenberg</li></ul>
 					<div class="links">
 						<div class="label">In this demo</div>
@@ -325,6 +325,7 @@
 							<a class="btn primary" href="{{$s}}://{{$studio}}{{$p}}/">Studio <span class="host">{{$studio}}</span></a>
 							<a class="btn" href="{{$s}}://{{$cms}}{{$p}}/">Demo Journal</a>
 							<a class="btn" href="{{$s}}://{{$minimal}}{{$p}}/">Demo Notes</a>
+							<a class="btn" href="{{$s}}://{{$space}}{{$p}}/">Starward</a>
 						</div>
 						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-cms">Project page</a> · <a href="https://github.com/pacod22/pacod-cms">Repository</a></div>
 					</div>

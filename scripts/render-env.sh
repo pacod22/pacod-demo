@@ -62,17 +62,23 @@ esac
 log_level_upper=$(printf %s "$log_level" | tr '[:lower:]' '[:upper:]')
 
 d=$DEMO_DOMAIN
-# The CMS's subdomains (demo.env): the studio's under DEMO_DOMAIN, the two demo websites' under
+# The CMS's subdomains (demo.env): the studio's under DEMO_DOMAIN, the three demo websites' under
 # DEMO_SITE_DOMAIN. One DNS label each.
 studio=${DEMO_STUDIO_SUBDOMAIN:-studio}
 cms=${DEMO_CMS_SUBDOMAIN:-cms}
 minimal=${DEMO_CMS_MINIMAL_SUBDOMAIN:-minimal}
-for pair in "DEMO_STUDIO_SUBDOMAIN=$studio" "DEMO_CMS_SUBDOMAIN=$cms" "DEMO_CMS_MINIMAL_SUBDOMAIN=$minimal"; do
+space=${DEMO_CMS_SPACE_SUBDOMAIN:-space}
+for pair in "DEMO_STUDIO_SUBDOMAIN=$studio" "DEMO_CMS_SUBDOMAIN=$cms" "DEMO_CMS_MINIMAL_SUBDOMAIN=$minimal" \
+	"DEMO_CMS_SPACE_SUBDOMAIN=$space"; do
 	case ${pair#*=} in
 		*[!a-z0-9-]* | -* | *-) echo "render-env: $pair is not a subdomain: lowercase letters, digits and inner hyphens" >&2; exit 1 ;;
 	esac
 done
-[ "$cms" != "$minimal" ] || { echo "render-env: DEMO_CMS_SUBDOMAIN and DEMO_CMS_MINIMAL_SUBDOMAIN are both $cms" >&2; exit 1; }
+[ "$cms" != "$minimal" ] && [ "$cms" != "$space" ] && [ "$minimal" != "$space" ] || {
+	echo "render-env: DEMO_CMS_SUBDOMAIN ($cms), DEMO_CMS_MINIMAL_SUBDOMAIN ($minimal) and" \
+		"DEMO_CMS_SPACE_SUBDOMAIN ($space) must differ" >&2
+	exit 1
+}
 # The studio sits beside the other products under DEMO_DOMAIN: never on one of their subdomains.
 for taken in id app chat console gw kb grafana mail prometheus; do
 	[ "$studio" != "$taken" ] || {
@@ -80,8 +86,8 @@ for taken in id app chat console gw kb grafana mail prometheus; do
 		exit 1
 	}
 done
-# The CMS's websites (demo.env's DEMO_SITE_DOMAIN): <id>.<sd>, the demo's <cms>.<sd> and
-# <minimal>.<sd>. A website runs its owner's script, so the studio refuses to start when <sd> shares
+# The CMS's websites (demo.env's DEMO_SITE_DOMAIN): <id>.<sd>, the demo's <cms>.<sd>,
+# <minimal>.<sd> and <space>.<sd>. A website runs its owner's script, so the studio refuses to start when <sd> shares
 # a registrable domain with <studio>.<d> and id.<d> -- unless it is a public suffix, as localhost
 # is, or DEMO_SITE_DOMAIN_SHARED=true accepts the risk. What can be told here, a domain the same as
 # the other or under it, stops the render instead; the studio checks the rest (another name under
@@ -116,11 +122,11 @@ fi
 # one the edge already routes: Caddy's own site would hide the website, and the demo websites are
 # created at these hosts unchecked.
 if [ "$sd" = "$d" ]; then
-	for h in "$cms" "$minimal"; do
+	for h in "$cms" "$minimal" "$space"; do
 		for taken in "$studio" id app chat console gw kb grafana mail prometheus; do
 			[ "$h" != "$taken" ] || {
 				echo "render-env: the CMS website subdomain $h.$d is already the edge's ($taken):" \
-					"choose another DEMO_CMS_SUBDOMAIN or DEMO_CMS_MINIMAL_SUBDOMAIN" >&2
+					"choose another DEMO_CMS_SUBDOMAIN, DEMO_CMS_MINIMAL_SUBDOMAIN or DEMO_CMS_SPACE_SUBDOMAIN" >&2
 				exit 1
 			}
 		done
@@ -251,6 +257,7 @@ GW_API_ORIGIN=$(url gw)
 CMS_STUDIO_ORIGIN=$(url "$studio")
 CMS_DEMO_ORIGIN=$(site_url "$cms")
 CMS_MINIMAL_ORIGIN=$(site_url "$minimal")
+CMS_SPACE_ORIGIN=$(site_url "$space")
 KB_ORIGIN=$(url kb)
 GRAFANA_ORIGIN=$(url grafana)
 MAIL_ORIGIN=$(url mail)
@@ -267,6 +274,7 @@ CMS_PUBLIC_SITE=$scheme://:$port
 CMS_STUDIO_HOST=$studio.$d
 CMS_DEMO_HOST=$cms.$sd
 CMS_MINIMAL_HOST=$minimal.$sd
+CMS_SPACE_HOST=$space.$sd
 # The studio's cookies: __Host- ones over HTTPS, which no other host can set (the dev profile the
 # demo runs leaves them plain; overlays/cms.yml).
 CMS_HOST_COOKIES=$cms_host_cookies
@@ -344,6 +352,7 @@ PACOD_SITE_DOMAIN_SHARED=$site_domain_shared
 DEMO_WEBSITES=true
 DEMO_HOSTS=$cms.$sd
 DEMO_MINIMAL_HOSTS=$minimal.$sd
+DEMO_SPACE_HOSTS=$space.$sd
 MONGO_DATA_DIR=cms-mongo-data
 MONGO_BACKUP_DIR=$state/cms/backup
 STORAGE_HOST=$state/cms/storage

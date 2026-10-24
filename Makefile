@@ -27,7 +27,7 @@ RECREATE := ap-api ap-admin-api ap-improvement-loop-worker ap-newsletter-worker 
 WAIT := --wait --wait-timeout 2400
 
 .PHONY: help up run verify down stop clean remove build status ps logs urls bootstrap \
-	preflight network tools init render seed hosts config shots
+	preflight network tools init render seed hosts config shots cms-space
 
 help:
 	@echo "pacod full-stack demo (configuration: demo.env)"
@@ -42,6 +42,7 @@ help:
 	@echo "  make logs S=<service>   follow one service's log (all without S)"
 	@echo "  make build     rebuild the images from the five checkouts"
 	@echo "  make bootstrap redo the cross-product credentials (after adding a provider key)"
+	@echo "  make cms-space create the CMS's space demo website on a stack started before it existed"
 	@echo "  make hosts     /etc/hosts lines (Safari and *.localhost, or a domain before its DNS)"
 	@echo "  make shots     retake the home page's screenshots from the running stack"
 
@@ -100,6 +101,21 @@ seed:
 
 verify:
 	@sh scripts/verify.sh
+
+# The CMS's third demo website, "Starward" (the space travels), for a stack whose CMS data predates
+# it: the studio creates its demo websites only on an empty platform. A one-off studio container
+# runs pacod-cms's --create-site (its `make site-create ... DEMO=space`) at CMS_SPACE_HOST.
+# ORG=org_... puts it in the demo organisation (its id is on the studio's Organisations screen);
+# without, it gets an organisation of its own. Refused, and nothing changed, if it exists. Needs a
+# studio image built from pacod-cms with the space demo (make build): an older one takes
+# --demo=space for --demo and fills the website with the journal.
+cms-space: render
+	@host=$$(sed -n 's/^CMS_SPACE_HOST=//p' .state/env/stack.env); \
+	$(COMPOSE) run --rm --no-deps -T cms-studio --spring.main.web-application-type=none \
+		--pacod.bootstrap.enabled=false --pacod.id.enabled=false --pacod.jobs.runner.enabled=false \
+		--logging.level.root=WARN --logging.level.io.pacod.cms.studio.site=INFO --app.log.dir=/tmp/logs \
+		--create-site --site-id=space --site-name=Starward --hosts="$$host" --language=en \
+		--demo=space $(if $(ORG),--org-id="$(ORG)")
 
 # ---- stop, remove ---------------------------------------------------------------------------------
 
@@ -161,6 +177,7 @@ urls: render
 	echo "  CMS studio (pacod-cms)      $$CMS_STUDIO_ORIGIN"; \
 	echo "  CMS demo website            $$CMS_DEMO_ORIGIN"; \
 	echo "  CMS minimal website         $$CMS_MINIMAL_ORIGIN"; \
+	echo "  CMS space website           $$CMS_SPACE_ORIGIN"; \
 	echo "  Knowledge base (pacod-kb)   $$KB_ORIGIN"; \
 	echo "  Identity (pacod-id)         $$PACOD_ID_ISSUER/admin"; \
 	echo "  Grafana                     $$GRAFANA_ORIGIN"; \
@@ -184,4 +201,5 @@ hosts:
 	if [ "$$DEMO_DOMAIN" != localhost ]; then echo "127.0.0.1 $$DEMO_DOMAIN"; fi; \
 	for h in id app chat console gw $${DEMO_STUDIO_SUBDOMAIN:-studio} kb grafana mail prometheus; do \
 		echo "127.0.0.1 $$h.$$DEMO_DOMAIN"; done; \
-	for h in $${DEMO_CMS_SUBDOMAIN:-cms} $${DEMO_CMS_MINIMAL_SUBDOMAIN:-minimal}; do echo "127.0.0.1 $$h.$$sd"; done
+	for h in $${DEMO_CMS_SUBDOMAIN:-cms} $${DEMO_CMS_MINIMAL_SUBDOMAIN:-minimal} $${DEMO_CMS_SPACE_SUBDOMAIN:-space}; do \
+		echo "127.0.0.1 $$h.$$sd"; done

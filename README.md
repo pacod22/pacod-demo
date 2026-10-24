@@ -47,7 +47,7 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 | https://console.demo.pacod.io | the gateway console (pacod-gw): providers, models, keys, usage |
 | https://gw.demo.pacod.io/v1 | the gateway's OpenAI-compatible API |
 | https://studio.demo.pacod.io | the CMS studio (pacod-cms; `DEMO_STUDIO_SUBDOMAIN`) |
-| https://cms.pacod-sites.net | a CMS demo website (also minimal.pacod-sites.net): the websites have a domain of their own, `DEMO_SITE_DOMAIN` (below), or with `DEMO_SITE_DOMAIN_SHARED=true` the demo's, cms.demo.pacod.io; the subdomains are `DEMO_CMS_SUBDOMAIN` and `DEMO_CMS_MINIMAL_SUBDOMAIN` |
+| https://cms.pacod-sites.net | a CMS demo website, "Demo Journal" (also "Demo Notes" at minimal.pacod-sites.net and "Starward", the space travels, at space.pacod-sites.net): the websites have a domain of their own, `DEMO_SITE_DOMAIN` (below), or with `DEMO_SITE_DOMAIN_SHARED=true` the demo's, cms.demo.pacod.io; the subdomains are `DEMO_CMS_SUBDOMAIN`, `DEMO_CMS_MINIMAL_SUBDOMAIN` and `DEMO_CMS_SPACE_SUBDOMAIN` |
 | https://kb.demo.pacod.io | the knowledge base (pacod-kb) |
 | https://id.demo.pacod.io/admin | identity administration (pacod-id) |
 | https://grafana.demo.pacod.io | dashboards of every product |
@@ -56,6 +56,11 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 
 Sign in anywhere as `DEMO_ADMIN_EMAIL` (default `admin@pacod.demo`); the password is in
 `demo.local.env`, or generated and shown by `make urls`. One sign-in covers every product.
+
+The CMS creates its demo websites on its first start only, while it has no website. A stack
+started before "Starward" existed gets it with `make build`, then `make cms-space` (`ORG=org_...`
+to put it in the demo organisation, whose id the studio's Organisations screen shows): an older
+studio image would fill it with the journal's content instead.
 
 ### HTTPS on a domain
 
