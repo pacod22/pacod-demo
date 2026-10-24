@@ -32,6 +32,7 @@ SHOTS = [
     ("ap-site", E["AP_ORIGIN"] + "/"),
     ("cms-studio", E["CMS_STUDIO_ORIGIN"] + "/mgmt/sites"),
     ("cms-site", E["CMS_DEMO_ORIGIN"] + "/"),
+    ("cms-space", E["CMS_SPACE_ORIGIN"] + "/"),
     ("kb", E["KB_ORIGIN"] + "/kb"),
 ]
 
