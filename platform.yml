@@ -106,6 +106,10 @@ services:
       CMS_MINIMAL_HOST: ${CMS_MINIMAL_HOST}
       CMS_SPACE_HOST: ${CMS_SPACE_HOST}
       KB_SITE: ${KB_SITE}
+      # The home page's notice of the nightly reset (the Makefile's scheduler).
+      DEMO_RESET: ${DEMO_RESET}
+      DEMO_RESET_TIME: ${DEMO_RESET_TIME}
+      DEMO_RESET_TIMEZONE: ${DEMO_RESET_TIMEZONE}
       # The request logs (docs/LOGGING.md): the demo's own sites and pacod-ap's (AP_SITE_OPTIONS
       # imports config/Caddyfile's demo_access_log), and each product fragment's format.
       AP_SITE_OPTIONS: ${AP_SITE_OPTIONS}

@@ -4,6 +4,8 @@
 	when it is the scheme's default). */ -}}
 {{- $d := env "DEMO_DOMAIN" }}{{ $studio := env "CMS_STUDIO_HOST" }}{{ $cms := env "CMS_DEMO_HOST" }}{{ $minimal := env "CMS_MINIMAL_HOST" }}{{ $space := env "CMS_SPACE_HOST" }}{{ $s := env "DEMO_URL_SCHEME" }}{{ $p := "" }}{{ with env "DEMO_URL_PORT" }}{{ $p = printf ":%s" . }}{{ end }}
 {{- $email := env "DEMO_ADMIN_EMAIL" }}{{ $public := eq (env "DEMO_PUBLIC") "true" }}
+{{- /* The nightly reset (the Makefile's scheduler): on only with a time and a baseline. */ -}}
+{{- $reset := eq (env "DEMO_RESET") "true" }}{{ $resetAt := env "DEMO_RESET_TIME" }}{{ $resetTz := env "DEMO_RESET_TIMEZONE" }}
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -23,6 +25,9 @@
 		--gw: #2dd4bf;
 		--pr: #60a5fa;
 		--on-accent: #0f1117;
+		--warn: #fbbf24;
+		--warn-bg: #2a2212;
+		--warn-line: #5c4714;
 		--shadow: 0 18px 40px rgb(0 0 0 / .45);
 		color-scheme: dark;
 	}
@@ -39,6 +44,9 @@
 			--gw: #0f766e;
 			--pr: #2563eb;
 			--on-accent: #ffffff;
+			--warn: #92400e;
+			--warn-bg: #fef3c7;
+			--warn-line: #f2d78a;
 			--shadow: 0 18px 40px rgb(18 21 28 / .12);
 			color-scheme: light;
 		}
@@ -63,6 +71,16 @@
 	.top nav { margin-left: auto; display: flex; gap: 20px; font-size: 14px; }
 	.top nav a { color: var(--muted); text-decoration: none; }
 	.top nav a:hover { color: var(--text); }
+
+	/* The nightly reset: a band under the header, on every visit. */
+	.reset { background: var(--warn-bg); border-bottom: 1px solid var(--warn-line); }
+	.reset .wrap { display: flex; gap: 14px; align-items: flex-start; padding-top: 14px; padding-bottom: 14px; }
+	.reset svg { flex: none; width: 22px; height: 22px; margin-top: 2px; color: var(--warn); }
+	.reset p { margin: 0; font-size: 15px; color: var(--soft); }
+	.reset strong { color: var(--text); }
+	.reset .when { color: var(--warn); font-weight: 700; white-space: nowrap; }
+	.reset .next { display: block; margin-top: 2px; font-size: 14px; color: var(--muted); }
+	.reset .next:empty { display: none; }
 
 	/* Intro */
 	.intro { padding-top: 56px; padding-bottom: 32px; display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: center; }
@@ -191,6 +209,58 @@
 		</nav>
 	</div>
 </header>
+
+{{- if $reset}}
+<aside class="reset" id="reset" aria-label="Nightly reset" data-at="{{$resetAt}}" data-tz="{{$resetTz}}">
+	<div class="wrap">
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>
+		<p>
+			<strong>This demo is reset every night at <span class="when">{{$resetAt}} {{$resetTz}}</span><span class="local"></span>.</strong>
+			Everything created or changed here is deleted: accounts, agents, articles, documents, keys and settings. Every
+			product goes back to its original state, and for a few minutes during the reset they do not answer.
+			<span class="next" aria-live="polite"></span>
+		</p>
+	</div>
+</aside>
+<script>
+	// The next reset in the visitor's own time, and how long until it: DEMO_RESET_TIME is a wall
+	// clock time in DEMO_RESET_TIMEZONE. Without Intl's time zones the band keeps its plain text.
+	(function () {
+		var box = document.getElementById("reset");
+		var at = box.dataset.at.split(":").map(Number), tz = box.dataset.tz;
+		function parts(date) {
+			var p = {};
+			new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "numeric",
+				day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" })
+				.formatToParts(date).forEach(function (x) { p[x.type] = +x.value; });
+			return p;
+		}
+		// The zone's offset from UTC at an instant, in milliseconds.
+		function offset(ms) {
+			var p = parts(new Date(ms));
+			return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(ms / 1000) * 1000;
+		}
+		function next(now) {
+			var today = parts(new Date(now));
+			for (var add = 0; add < 3; add++) {
+				var wall = Date.UTC(today.year, today.month - 1, today.day + add, at[0], at[1]);
+				var t = wall - offset(wall);
+				t = wall - offset(t);
+				if (t > now) return t;
+			}
+		}
+		function show() {
+			var now = Date.now(), t = next(now), mins = Math.ceil((t - now) / 60000);
+			var local = new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+			var same = -new Date(t).getTimezoneOffset() * 60000 === offset(t);
+			box.querySelector(".local").textContent = same ? "" : " (" + local + " your time)";
+			box.querySelector(".next").textContent = "Next reset in " +
+				(mins >= 60 ? Math.floor(mins / 60) + " h " + (mins % 60) + " min" : mins + " min") + ".";
+		}
+		try { show(); setInterval(show, 30000); } catch (e) { /* the plain text stays */ }
+	})();
+</script>
+{{- end}}
 
 <main>
 	<div class="wrap intro">
@@ -406,6 +476,7 @@
 			<pre class="cmds" style="margin-top:28px"><span class="c"># in pacod-demo/</span>
 make urls      <span class="c"># the addresses and the admin's password</span>
 make verify    <span class="c"># check that everything works together</span>
+make reset     <span class="c"># undo every change now{{if $reset}} (also every night at {{$resetAt}} {{$resetTz}}){{end}}</span>
 make shots     <span class="c"># retake this page's screenshots</span>
 make down      <span class="c"># stop; the data stays</span></pre>
 		</div>

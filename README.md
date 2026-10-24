@@ -7,6 +7,7 @@ one platform. One configuration file, one `make`.
 ```sh
 make up        # build, start, bootstrap; prints the addresses and the admin's password
 make verify    # check that everything works together
+make reset     # undo every change: back to the baseline (also every night, 05:00 UTC by default)
 make down      # stop (data is kept)
 make clean     # remove everything the demo made (IMAGES=1: its images too)
 make shots     # retake the home page's screenshots from the running stack
@@ -111,10 +112,38 @@ In demo.env: `DEMO_DOMAIN=localhost`, `DEMO_TLS_CERT=` and `DEMO_TLS_KEY=` (empt
 http://<name>.localhost:8800 (browsers and curl resolve `*.localhost` to 127.0.0.1 without DNS;
 Safari may not: use another browser, or add `make hosts`'s lines to `/etc/hosts`).
 
+## The nightly reset
+
+Every day at `DEMO_RESET_TIME` (demo.env, default `05:00`) in `DEMO_RESET_TIMEZONE` (default
+`UTC`) the demo undoes every change made to it: accounts, agents, articles, documents, keys,
+settings. Every product's data goes back to the **baseline**, and the products are unavailable for
+a few minutes meanwhile. The home page announces it in a band under its header, with the time in
+the visitor's own zone and how long until the next reset; `make urls` says it too.
+
+- **The baseline** is the stack's data at one moment: the first `make up` of a fresh stack keeps
+  what it made, once the CMS has written its demo websites. `make baseline` keeps the data as it is
+  now instead, e.g. on a stack that existed before the reset did (it has no baseline, and no
+  nightly reset until it gets one), or after adding content every visitor should find. For the
+  original state from scratch: `make clean`, `make up`.
+- **What it holds**: every data volume of the stack (PostgreSQL, MongoDB, Qdrant, ClickHouse,
+  Redis, the knowledge base's and the app's files, Grafana, Alertmanager), the CMS's files
+  (`.state/cms/storage`) and the bootstrap's credentials. Not the models, Prometheus's metrics or
+  the edge's own data. It is kept, compressed, in the Docker volume `pacod-demo-baseline`;
+  `make clean` deletes it with the rest.
+- **`make reset`** does the same as the nightly reset, now. Both stop every service but the edge
+  (the home page stays up), put the baseline back, start the stack and run the bootstrap again,
+  which applies what `demo.local.env` has gained since the baseline (a provider key). The admin's
+  password is the baseline's: after changing it, `make baseline` again.
+- **The scheduler** is the container `pacod-demo-reset` that `make up` starts (and `make down`
+  stops). It is outside the compose project, since a reset stops the project, runs `make reset`
+  from this checkout through Docker's socket, and logs to `docker logs pacod-demo-reset`. It skips a
+  night when the stack is not running, or when the machine was asleep at the time (a laptop).
+- **Off**: `DEMO_RESET_TIME=` (empty), then `make up`.
+
 ## Configuration: demo.env and demo.local.env
 
 `demo.env` is the configuration. It sets the domains (the stack's and the websites') and ports,
-the certificate, the first administrator's email, the optional component
+the certificate, the first administrator's email, the nightly reset's time, the optional component
 (`DEMO_PROFILES=ingestion`), the models each product uses, the embedding backend and the log
 directory. Run `make up` after a change. Git
 ignores it: the first `make` copies it from `demo.env.example`, the committed template; change
@@ -189,4 +218,6 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
 | `preflight: certs/... is the self-signed placeholder`, sign-in fails, browsers warn | Put the real certificate and key in certs/ ([certs/README.md](certs/README.md)), then `docker restart pacod-caddy`. |
 | Caddy cannot read the key (Linux) | The edge runs as root without the capability to bypass file permissions: `sudo chown root:root certs/<key>`, or `chmod 644` it. |
 | The CMS's websites have no articles | Their demo content failed on the first start, and the studio does not try again. `make logs S=cms-studio` says why ("Could not store the demo picture ..." was the CMS writing its files as another user than the one owning `.state/`, fixed). Then `make build`, `make up` and `make cms-seed` per website ([The CMS's demo websites](#the-cmss-demo-websites)). |
+| `baseline: another save or restore is running` | A reset is running (`docker logs pacod-demo-reset`); if none is, one was interrupted: remove `.state/baseline.lock`. |
+| The home page announces no nightly reset | There is no baseline yet (`make urls` says so): `make baseline`. |
 | Chat answers are "echo: ..." or off-topic | That is the mock provider: set a provider key in demo.local.env and run `make bootstrap`. |

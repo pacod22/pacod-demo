@@ -212,6 +212,25 @@ else
 	printf '%s\n' "$EMBEDDINGS_BACKEND" > "$state/embeddings-backend"
 fi
 
+# The nightly reset (demo.env's DEMO_RESET_TIME and DEMO_RESET_TIMEZONE; the Makefile's scheduler).
+# ${...-...}, not ${...:-...}: an empty time is "off", and only a demo.env older than the reset, which
+# lacks the line, gets the default.
+reset_time=${DEMO_RESET_TIME-05:00}
+reset_tz=${DEMO_RESET_TIMEZONE:-UTC}
+case $reset_time in
+	'' | [01][0-9]:[0-5][0-9] | 2[0-3]:[0-5][0-9]) ;;
+	[0-9]:[0-5][0-9]) reset_time=0$reset_time ;;
+	*) echo "render-env: DEMO_RESET_TIME=$reset_time is not a time of day: HH:MM (24 hours), or empty for none" >&2; exit 1 ;;
+esac
+if [ -d /usr/share/zoneinfo ] && [ ! -f "/usr/share/zoneinfo/$reset_tz" ]; then
+	echo "render-env: DEMO_RESET_TIMEZONE=$reset_tz is not a time zone (e.g. UTC, Europe/Berlin)" >&2
+	exit 1
+fi
+# On only with a baseline to go back to (scripts/baseline.sh writes .state/baseline once a save has
+# finished): the home page announces no reset that would not happen.
+reset=false
+if [ -n "$reset_time" ] && [ -f "$state/baseline" ]; then reset=true; fi
+
 # ---- every include ----------------------------------------------------------------------------
 {
 	cat <<EOF
@@ -235,6 +254,10 @@ DEMO_PROFILES=$DEMO_PROFILES
 EMBEDDINGS_BACKEND=$EMBEDDINGS_BACKEND
 TORCH_NUM_THREADS=$TORCH_NUM_THREADS
 CMS_AI_MODEL=$CMS_AI_MODEL
+# The nightly reset: when (in that time zone), and whether it runs (a time and a baseline).
+DEMO_RESET=$reset
+DEMO_RESET_TIME=$reset_time
+DEMO_RESET_TIMEZONE=$reset_tz
 # The log files' directory on this machine (overlays/ap.yml, cms's LOG_DIR_HOST).
 DEMO_LOG_DIR=$log_dir
 # Every product's log level and format (docs/LOGGING.md); the product files below spell them out.
