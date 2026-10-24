@@ -231,6 +231,36 @@ fi
 reset=false
 if [ -n "$reset_time" ] && [ -f "$state/baseline" ]; then reset=true; fi
 
+# Google Search and Analytics (demo.env): the home page's (its template, config/Caddyfile) and
+# Starward's (scripts/google.sh). Checked against the shape Google issues: the home page's template
+# writes them into its markup unescaped, and the CMS renders nothing for a value of another shape.
+home_google_tag=${DEMO_HOME_GOOGLE_TAG:-}
+home_google_verification=${DEMO_HOME_GOOGLE_SITE_VERIFICATION:-}
+starward_gtm_id=${DEMO_STARWARD_GTM_ID:-}
+starward_google_verification=${DEMO_STARWARD_GOOGLE_SITE_VERIFICATION:-}
+if [ -n "$home_google_tag" ] && ! printf %s "$home_google_tag" | grep -Eqx 'G-[A-Z0-9]{4,16}|GTM-[A-Z0-9]{4,12}'; then
+	echo "render-env: DEMO_HOME_GOOGLE_TAG=$home_google_tag is neither a GA4 measurement id (G-XXXXXXXXXX)" \
+		"nor a Google Tag Manager container (GTM-XXXXXXX)" >&2
+	exit 1
+fi
+case $starward_gtm_id in
+	G-*) echo "render-env: DEMO_STARWARD_GTM_ID=$starward_gtm_id is a GA4 measurement id: the CMS loads only a Google" \
+		"Tag Manager container (GTM-XXXXXXX), with a Google tag for that id inside it (demo.env.example)" >&2
+		exit 1 ;;
+esac
+if [ -n "$starward_gtm_id" ] && ! printf %s "$starward_gtm_id" | grep -Eqx 'GTM-[A-Z0-9]{4,12}'; then
+	echo "render-env: DEMO_STARWARD_GTM_ID=$starward_gtm_id is not a Google Tag Manager container (GTM-XXXXXXX)" >&2
+	exit 1
+fi
+for pair in "DEMO_HOME_GOOGLE_SITE_VERIFICATION=$home_google_verification" \
+	"DEMO_STARWARD_GOOGLE_SITE_VERIFICATION=$starward_google_verification"; do
+	if [ -n "${pair#*=}" ] && ! printf %s "${pair#*=}" | grep -Eqx '[A-Za-z0-9_-]{8,128}'; then
+		echo "render-env: ${pair%%=*} is not a Search Console verification: the content=\"...\" value of its" \
+			"meta tag only (letters, digits, - and _)" >&2
+		exit 1
+	fi
+done
+
 # ---- every include ----------------------------------------------------------------------------
 {
 	cat <<EOF
@@ -258,6 +288,12 @@ CMS_AI_MODEL=$CMS_AI_MODEL
 DEMO_RESET=$reset
 DEMO_RESET_TIME=$reset_time
 DEMO_RESET_TIMEZONE=$reset_tz
+# Google Search and Analytics: the home page's (the edge, platform.yml) and Starward's
+# (scripts/google.sh); empty: none.
+DEMO_HOME_GOOGLE_TAG=$home_google_tag
+DEMO_HOME_GOOGLE_SITE_VERIFICATION=$home_google_verification
+DEMO_STARWARD_GTM_ID=$starward_gtm_id
+DEMO_STARWARD_GOOGLE_SITE_VERIFICATION=$starward_google_verification
 # The log files' directory on this machine (overlays/ap.yml, cms's LOG_DIR_HOST).
 DEMO_LOG_DIR=$log_dir
 # Every product's log level and format (docs/LOGGING.md); the product files below spell them out.

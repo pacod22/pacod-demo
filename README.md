@@ -126,6 +126,26 @@ In demo.env: `DEMO_DOMAIN=localhost`, `DEMO_TLS_CERT=` and `DEMO_TLS_KEY=` (empt
 http://<name>.localhost:8800 (browsers and curl resolve `*.localhost` to 127.0.0.1 without DNS;
 Safari may not: use another browser, or add `make hosts`'s lines to `/etc/hosts`).
 
+### Google Search and Analytics
+
+The home page and Starward can each be verified in Google Search Console and counted by Google
+Analytics, set in demo.env (empty: nothing of Google's on the page, the default):
+
+| demo.env | |
+|---|---|
+| `DEMO_HOME_GOOGLE_TAG` | the home page's GA4 measurement id (`G-…`, loaded with gtag.js) or Tag Manager container (`GTM-…`) |
+| `DEMO_HOME_GOOGLE_SITE_VERIFICATION` | the `content` of the home page's Search Console meta tag (the "HTML tag" method) |
+| `DEMO_STARWARD_GTM_ID` | Starward's Tag Manager container (`GTM-…`): the CMS loads Tag Manager only, so GA4 comes through a Google tag with the measurement id inside the container |
+| `DEMO_STARWARD_GOOGLE_SITE_VERIFICATION` | the `content` of Starward's Search Console meta tag |
+
+`make up` stops on a value that is not of Google's shape. The home page's apply on `make up`
+(the edge is recreated). Starward's are written into its settings in the CMS by `make up`,
+`make reset` (so also every night) and `make cms-space`, and show within the CMS's 60-second
+cache. demo.env owns those two fields: a value removed there is removed from Starward too.
+Instead of the two verifications, a Search Console domain property (a DNS TXT record on the
+registrable domain) covers both hosts. Each CMS website answers its own `/robots.txt` and
+`/sitemap.xml`, which Search Console takes for Starward.
+
 ## The nightly reset
 
 Every day at `DEMO_RESET_TIME` (demo.env, default `05:00`) in `DEMO_RESET_TIMEZONE` (default

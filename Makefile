@@ -36,7 +36,7 @@ WAIT := --wait --wait-timeout 2400
 
 .PHONY: help up run verify down stop clean remove build status ps logs urls bootstrap \
 	preflight network tools init render seed hosts config shots cms-space cms-seed \
-	baseline first-baseline reset scheduler reset-image
+	baseline first-baseline reset scheduler reset-image google
 
 help:
 	@echo "pacod full-stack demo (configuration: demo.env)"
@@ -55,6 +55,7 @@ help:
 	@echo "  make baseline  keep the data as it is now as the state every reset returns to"
 	@echo "  make cms-space create the CMS's Starward website (magazine design) on a stack without it"
 	@echo "  make cms-seed SITE=<id> [DEMO=space]   the demo content into a CMS website without articles"
+	@echo "  make google    write Starward's Google settings (demo.env) into the CMS again"
 	@echo "  make hosts     /etc/hosts lines (Safari and *.localhost, or a domain before its DNS)"
 	@echo "  make shots     retake the home page's screenshots from the running stack"
 
@@ -66,6 +67,7 @@ up: preflight network tools init render
 	@$(MAKE) --no-print-directory bootstrap
 	@$(MAKE) --no-print-directory seed
 	@$(MAKE) --no-print-directory first-baseline
+	@$(MAKE) --no-print-directory google
 	@$(MAKE) --no-print-directory scheduler
 	@$(MAKE) --no-print-directory urls
 
@@ -142,6 +144,7 @@ first-baseline:
 reset: render reset-image
 	@sh scripts/baseline.sh restore
 	@$(MAKE) --no-print-directory bootstrap
+	@$(MAKE) --no-print-directory google
 
 # The scheduler's container, made again on every make up (the time may have changed): outside the
 # compose project, since a reset stops the project; as the user who runs make, with the socket's
@@ -167,6 +170,13 @@ scheduler: render reset-image
 		-w "$(CURDIR)" $(RESET) sh scripts/reset-scheduler.sh >/dev/null; \
 	echo "scheduler: the demo resets every day at $$DEMO_RESET_TIME $$DEMO_RESET_TIMEZONE (docker logs pacod-demo-reset)"
 
+# Starward's Google Tag Manager container and Search Console verification (demo.env), into its
+# settings in the CMS. After first-baseline in make up (a fresh stack's CMS writes Starward's
+# settings until wait-cms is done) and after every reset (the baseline may hold others). The home
+# page's are the edge's: make up.
+google: render
+	@sh scripts/google.sh
+
 # The CMS's third demo website, "Starward" (the space travels), on the magazine template set, for a
 # stack whose CMS data predates it or holds its earlier version: the studio creates its demo
 # websites only on an empty platform. A one-off studio container runs pacod-cms's --create-site
@@ -186,6 +196,7 @@ cms-space: render
 			2>/dev/null) || org=; fi; \
 	$(CMS_CLI) --create-site --site-id=space --site-name=Starward --hosts="$$host" --language=en \
 		--template-set=magazine --demo=space $${org:+--org-id="$$org"} || exit 1; \
+	sh scripts/google.sh; \
 	if [ -f .state/baseline ]; then \
 		echo "cms-space: the nightly reset still returns to the baseline of $$(cat .state/baseline)," \
 			"without this Starward: make baseline to keep it"; fi

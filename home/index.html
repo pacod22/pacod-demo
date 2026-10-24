@@ -6,12 +6,28 @@
 {{- $email := env "DEMO_ADMIN_EMAIL" }}{{ $public := eq (env "DEMO_PUBLIC") "true" }}
 {{- /* The nightly reset (the Makefile's scheduler): on only with a time and a baseline. */ -}}
 {{- $reset := eq (env "DEMO_RESET") "true" }}{{ $resetAt := env "DEMO_RESET_TIME" }}{{ $resetTz := env "DEMO_RESET_TIMEZONE" }}
+{{- /* Google (demo.env): a GA4 measurement id (G-...) or a Tag Manager container (GTM-...), and the
+	Search Console verification. Written unescaped: scripts/render-env.sh accepts only Google's shapes. */ -}}
+{{- $gtag := env "DEMO_HOME_GOOGLE_TAG" }}{{ $gtm := hasPrefix "GTM-" $gtag }}
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>pacod demo</title>
 <meta name="description" content="The whole pacod stack on one machine: identity, AI gateway, agents, CMS and knowledge base.">
+{{- with env "DEMO_HOME_GOOGLE_SITE_VERIFICATION" }}
+<meta name="google-site-verification" content="{{.}}">
+{{- end }}
+{{- if $gtm }}
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});
+var f=d.getElementsByTagName(s)[0],j=d.createElement(s);j.async=true;
+j.src='https://www.googletagmanager.com/gtm.js?id='+i;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','{{$gtag}}');</script>
+{{- else if $gtag }}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{$gtag}}"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+gtag('js',new Date());gtag('config','{{$gtag}}');</script>
+{{- end }}
 <style>
 	:root {
 		--bg: #0f1117;
@@ -197,6 +213,9 @@
 </style>
 </head>
 <body>
+{{- if $gtm }}
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id={{$gtag}}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+{{- end }}
 
 <header class="top">
 	<div class="wrap">

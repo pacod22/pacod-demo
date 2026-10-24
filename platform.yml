@@ -110,6 +110,9 @@ services:
       DEMO_RESET: ${DEMO_RESET}
       DEMO_RESET_TIME: ${DEMO_RESET_TIME}
       DEMO_RESET_TIMEZONE: ${DEMO_RESET_TIMEZONE}
+      # The home page's Google Search Console verification and analytics tag (demo.env).
+      DEMO_HOME_GOOGLE_TAG: ${DEMO_HOME_GOOGLE_TAG}
+      DEMO_HOME_GOOGLE_SITE_VERIFICATION: ${DEMO_HOME_GOOGLE_SITE_VERIFICATION}
       # The request logs (docs/LOGGING.md): the demo's own sites and pacod-ap's (AP_SITE_OPTIONS
       # imports config/Caddyfile's demo_access_log), and each product fragment's format.
       AP_SITE_OPTIONS: ${AP_SITE_OPTIONS}
