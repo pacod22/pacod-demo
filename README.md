@@ -57,10 +57,22 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 Sign in anywhere as `DEMO_ADMIN_EMAIL` (default `admin@pacod.demo`); the password is in
 `demo.local.env`, or generated and shown by `make urls`. One sign-in covers every product.
 
-The CMS creates its demo websites on its first start only, while it has no website. A stack
-started before "Starward" existed gets it with `make build`, then `make cms-space` (`ORG=org_...`
-to put it in the demo organisation, whose id the studio's Organisations screen shows): an older
-studio image would fill it with the journal's content instead.
+### The CMS's demo websites
+
+The studio creates its three demo websites, with their sections, authors, articles and pictures,
+**on its first start only, while it has no website at all**: "Demo Journal", "Demo Notes" and
+"Starward". A website whose demo content failed then stays empty, and is never filled again by
+itself. `make up` starts the images it finds and never rebuilds them, so after pulling the
+repositories run `make build` first: the studio's image carries the demo content and the seeds.
+
+- **From scratch**, every website with its content (this also deletes the accounts, keys and
+  data of every product; demo.env and demo.local.env stay): pull the six repositories, then
+  `make build`, `make clean`, `make up`.
+- **Keeping the data**: pull, `make build`, `make up`, then fill each empty website:
+  `make cms-seed SITE=demo`, `make cms-seed SITE=minimal` and `make cms-seed SITE=space DEMO=space`.
+  It refuses a website that has articles and writes nothing then. A stack started before
+  "Starward" existed creates it with `make cms-space` instead (`ORG=org_...` to put it in the demo
+  organisation, whose id the studio's Organisations screen shows).
 
 ### HTTPS on a domain
 
@@ -176,4 +188,5 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
 | A port (80, 443, 8800) is in use | Change `DEMO_HTTP_PORT` or `DEMO_HTTPS_PORT` in demo.env; then `make clean` and `make up` (the address is part of the sign-in configuration). |
 | `preflight: certs/... is the self-signed placeholder`, sign-in fails, browsers warn | Put the real certificate and key in certs/ ([certs/README.md](certs/README.md)), then `docker restart pacod-caddy`. |
 | Caddy cannot read the key (Linux) | The edge runs as root without the capability to bypass file permissions: `sudo chown root:root certs/<key>`, or `chmod 644` it. |
+| The CMS's websites have no articles | Their demo content failed on the first start, and the studio does not try again. `make logs S=cms-studio` says why ("Could not store the demo picture ..." was the CMS writing its files as another user than the one owning `.state/`, fixed). Then `make build`, `make up` and `make cms-seed` per website ([The CMS's demo websites](#the-cmss-demo-websites)). |
 | Chat answers are "echo: ..." or off-topic | That is the mock provider: set a provider key in demo.local.env and run `make bootstrap`. |

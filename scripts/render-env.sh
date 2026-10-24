@@ -279,6 +279,10 @@ CMS_SPACE_HOST=$space.$sd
 # demo runs leaves them plain; overlays/cms.yml).
 CMS_HOST_COOKIES=$cms_host_cookies
 CMS_SESSION_COOKIE=$cms_session_cookie
+# Who the CMS's containers run as (overlays/cms.yml): the user who runs make, who owns the
+# directories they write under .state and DEMO_LOG_DIR.
+DEMO_UID=$(id -u)
+DEMO_GID=$(id -g)
 KB_SITE=$(url kb)
 
 # The demo's own sites (config/Caddyfile). Quoted where a value has spaces or \$: compose reads

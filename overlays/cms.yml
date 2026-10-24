@@ -11,12 +11,17 @@ services:
     ports: !reset []
 
   cms-site:
+    # As the user who runs make, not the image's own (uid 100): on Linux that one cannot write the
+    # log directory render-env.sh made, nor the studio the website files below, where every demo
+    # picture failed and with it every demo article. The files stay that user's (make clean).
+    user: "${DEMO_UID}:${DEMO_GID}"
     ports: !reset []
     environment:
       SITE_PUBLIC_SCHEME: ${DEMO_URL_SCHEME}
       SITE_PUBLIC_PORT: ${DEMO_URL_PORT}
 
   cms-studio:
+    user: "${DEMO_UID}:${DEMO_GID}"
     ports: !reset []
     environment:
       SITE_PUBLIC_SCHEME: ${DEMO_URL_SCHEME}

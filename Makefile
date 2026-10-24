@@ -24,10 +24,15 @@ TOOLS_RUN = docker run --rm --network pacod-net --user $$(id -u):$$(id -g) \
 	--env-file .state/env/stack.env $(TOOLS)
 # The app's services that read the bootstrap's credentials (and the products' that read theirs).
 RECREATE := ap-api ap-admin-api ap-improvement-loop-worker ap-newsletter-worker cms-studio kb-pipeline
+# A one-off CMS studio container running one of its commands (pacod-cms's STUDIO_CLI): no web
+# server, bootstrap, pacod-id or jobs.
+CMS_CLI = $(COMPOSE) run --rm --no-deps -T cms-studio --spring.main.web-application-type=none \
+	--pacod.bootstrap.enabled=false --pacod.id.enabled=false --pacod.jobs.runner.enabled=false \
+	--logging.level.root=WARN --logging.level.io.pacod.cms.studio.site=INFO --app.log.dir=/tmp/logs
 WAIT := --wait --wait-timeout 2400
 
 .PHONY: help up run verify down stop clean remove build status ps logs urls bootstrap \
-	preflight network tools init render seed hosts config shots cms-space
+	preflight network tools init render seed hosts config shots cms-space cms-seed
 
 help:
 	@echo "pacod full-stack demo (configuration: demo.env)"
@@ -43,6 +48,7 @@ help:
 	@echo "  make build     rebuild the images from the five checkouts"
 	@echo "  make bootstrap redo the cross-product credentials (after adding a provider key)"
 	@echo "  make cms-space create the CMS's space demo website on a stack started before it existed"
+	@echo "  make cms-seed SITE=<id> [DEMO=space]   the demo content into a CMS website without articles"
 	@echo "  make hosts     /etc/hosts lines (Safari and *.localhost, or a domain before its DNS)"
 	@echo "  make shots     retake the home page's screenshots from the running stack"
 
@@ -111,11 +117,15 @@ verify:
 # --demo=space for --demo and fills the website with the journal.
 cms-space: render
 	@host=$$(sed -n 's/^CMS_SPACE_HOST=//p' .state/env/stack.env); \
-	$(COMPOSE) run --rm --no-deps -T cms-studio --spring.main.web-application-type=none \
-		--pacod.bootstrap.enabled=false --pacod.id.enabled=false --pacod.jobs.runner.enabled=false \
-		--logging.level.root=WARN --logging.level.io.pacod.cms.studio.site=INFO --app.log.dir=/tmp/logs \
-		--create-site --site-id=space --site-name=Starward --hosts="$$host" --language=en \
+	$(CMS_CLI) --create-site --site-id=space --site-name=Starward --hosts="$$host" --language=en \
 		--demo=space $(if $(ORG),--org-id="$(ORG)")
+
+# The demo content into an existing CMS website (pacod-cms's `make seed`): the journal, or with
+# DEMO=space the space travels. Refused, and nothing written, if the website has articles; a run
+# that stopped halfway (a demo picture that could not be stored) is finished by running it again.
+cms-seed: render
+	@test -n "$(SITE)" || { echo 'usage: make cms-seed SITE=<website id: demo, minimal, space> [DEMO=space]'; exit 2; }
+	$(CMS_CLI) --seed-demo --site-id="$(SITE)" $(if $(DEMO),--demo="$(DEMO)")
 
 # ---- stop, remove ---------------------------------------------------------------------------------
 
