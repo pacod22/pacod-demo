@@ -330,6 +330,12 @@ def cms() -> None:
     section("cms (pacod-cms)")
     status, page, _ = http("GET", E["CMS_DEMO_ORIGIN"] + "/")
     report(status == 200 and "<html" in str(page).lower(), "the demo website renders", str(status))
+    # Starward on the magazine template set; an earlier one is replaced as README.md says (The CMS's
+    # demo websites).
+    status, page, _ = http("GET", E["CMS_SPACE_ORIGIN"] + "/")
+    ok = status == 200 and "/site-assets/magazine.css" in str(page)
+    report(ok, "Starward renders on the magazine set",
+           "" if ok else str(status) if status != 200 else "another set: README.md, The CMS's demo websites")
     check("the studio's login page", E["CMS_STUDIO_ORIGIN"] + "/mgmt/login", want=(200, 302))
 
 

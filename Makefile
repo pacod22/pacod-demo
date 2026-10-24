@@ -53,7 +53,7 @@ help:
 	@echo "  make build     rebuild the images from the five checkouts"
 	@echo "  make bootstrap redo the cross-product credentials (after adding a provider key)"
 	@echo "  make baseline  keep the data as it is now as the state every reset returns to"
-	@echo "  make cms-space create the CMS's space demo website on a stack started before it existed"
+	@echo "  make cms-space create the CMS's Starward website (magazine design) on a stack without it"
 	@echo "  make cms-seed SITE=<id> [DEMO=space]   the demo content into a CMS website without articles"
 	@echo "  make hosts     /etc/hosts lines (Safari and *.localhost, or a domain before its DNS)"
 	@echo "  make shots     retake the home page's screenshots from the running stack"
@@ -167,21 +167,33 @@ scheduler: render reset-image
 		-w "$(CURDIR)" $(RESET) sh scripts/reset-scheduler.sh >/dev/null; \
 	echo "scheduler: the demo resets every day at $$DEMO_RESET_TIME $$DEMO_RESET_TIMEZONE (docker logs pacod-demo-reset)"
 
-# The CMS's third demo website, "Starward" (the space travels), for a stack whose CMS data predates
-# it: the studio creates its demo websites only on an empty platform. A one-off studio container
-# runs pacod-cms's --create-site (its `make site-create ... DEMO=space`) at CMS_SPACE_HOST.
-# ORG=org_... puts it in the demo organisation (its id is on the studio's Organisations screen);
-# without, it gets an organisation of its own. Refused, and nothing changed, if it exists. Needs a
-# studio image built from pacod-cms with the space demo (make build): an older one takes
-# --demo=space for --demo and fills the website with the journal.
+# The CMS's third demo website, "Starward" (the space travels), on the magazine template set, for a
+# stack whose CMS data predates it or holds its earlier version: the studio creates its demo
+# websites only on an empty platform. A one-off studio container runs pacod-cms's --create-site
+# (its `make site-create ... DEMO=space`) at CMS_SPACE_HOST, in the demo website's organisation
+# (ORG=org_... another; none found: an organisation of its own). Refused, and nothing changed,
+# while a website `space` exists or was deleted less than three minutes ago (README.md: The CMS's
+# demo websites). Needs a studio image built from pacod-cms with the magazine set (make build): an
+# older one refuses the set before it creates anything. The baseline still holds the stack as it
+# was, so the nightly reset would take Starward back: make baseline afterwards.
 cms-space: render
 	@host=$$(sed -n 's/^CMS_SPACE_HOST=//p' .state/env/stack.env); \
+	org="$(ORG)"; \
+	if [ -z "$$org" ]; then \
+		org=$$(docker exec cms-mongo sh -c 'mongosh --quiet -u "$$MONGO_INITDB_ROOT_USERNAME" \
+			-p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval \
+			"print(db.getSiblingDB(\"pacod_cms\").website.findOne({_id: \"demo\"})?.organisationId ?? \"\")"' \
+			2>/dev/null) || org=; fi; \
 	$(CMS_CLI) --create-site --site-id=space --site-name=Starward --hosts="$$host" --language=en \
-		--demo=space $(if $(ORG),--org-id="$(ORG)")
+		--template-set=magazine --demo=space $${org:+--org-id="$$org"} || exit 1; \
+	if [ -f .state/baseline ]; then \
+		echo "cms-space: the nightly reset still returns to the baseline of $$(cat .state/baseline)," \
+			"without this Starward: make baseline to keep it"; fi
 
 # The demo content into an existing CMS website (pacod-cms's `make seed`): the journal, or with
 # DEMO=space the space travels. Refused, and nothing written, if the website has articles; a run
 # that stopped halfway (a demo picture that could not be stored) is finished by running it again.
+# It keeps the website's template set: Starward's layouts only on magazine (else cms-space).
 cms-seed: render
 	@test -n "$(SITE)" || { echo 'usage: make cms-seed SITE=<website id: demo, minimal, space> [DEMO=space]'; exit 2; }
 	$(CMS_CLI) --seed-demo --site-id="$(SITE)" $(if $(DEMO),--demo="$(DEMO)")

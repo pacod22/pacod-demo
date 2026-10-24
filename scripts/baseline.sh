@@ -150,17 +150,21 @@ restore() {
 	say "restored the baseline of $taken"
 }
 
+# A number from the CMS's MongoDB: mongosh's --eval of $1, 0 on failure.
+cms_count() {
+	docker exec cms-mongo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" \
+		-p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "$0"' "$1" \
+		2>/dev/null || echo 0
+}
+
 # The CMS writes its demo websites after its health check passes, and a copy taken meanwhile would
-# keep a half-written one for good: wait until each has its articles (they are written last).
+# keep a half-written one for good: wait until each has its articles, then for what follows them.
 wait_cms() {
 	say "waiting for the CMS's demo websites"
 	i=0
 	while :; do
-		n=$(docker exec cms-mongo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" \
-			-p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "
-				[\"demo\", \"minimal\", \"space\"].filter(s =>
-					db.getSiblingDB(\"site_\" + s).article.estimatedDocumentCount() > 0).length"' \
-			2>/dev/null || echo 0)
+		n=$(cms_count '["demo", "minimal", "space"].filter(s =>
+			db.getSiblingDB("site_" + s).article.estimatedDocumentCount() > 0).length')
 		[ "$n" = 3 ] && break
 		i=$((i + 1))
 		if [ "$i" -ge 120 ]; then
@@ -170,8 +174,20 @@ wait_cms() {
 		fi
 		sleep 5
 	done
-	# The demo's bookings follow the articles.
-	sleep 15
+	# The bookings follow the articles, and Starward's advertisers take a while: its share picture
+	# is written last of all (pacod-cms's StudioDemo). Up to two minutes for it; a studio image
+	# older than the magazine Starward writes none, and goes on after that.
+	i=0
+	while [ "$i" -lt 24 ] && [ "$(cms_count 'db.getSiblingDB("site_space").siteSettings
+			.countDocuments({ogImage: {$nin: [null, ""]}})')" != 1 ]; do
+		sleep 5
+		i=$((i + 1))
+	done
+	if [ "$i" -ge 24 ]; then
+		say "Starward has no share picture after two minutes: it may lack its advertisers too." \
+			"Look at it; if it does, replace it (README.md: The CMS's demo websites), then make baseline"
+	fi
+	sleep 5
 }
 
 case ${1:-} in

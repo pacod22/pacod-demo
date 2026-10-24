@@ -61,19 +61,33 @@ Sign in anywhere as `DEMO_ADMIN_EMAIL` (default `admin@pacod.demo`); the passwor
 ### The CMS's demo websites
 
 The studio creates its three demo websites, with their sections, authors, articles and pictures,
-**on its first start only, while it has no website at all**: "Demo Journal", "Demo Notes" and
-"Starward". A website whose demo content failed then stays empty, and is never filled again by
+**on its first start only, while it has no website at all**: "Demo Journal" (the editorial
+template set), "Demo Notes" (minimal) and "Starward" (magazine). Starward is the showcase: an
+image-led magazine with a full-width cover story, 24 long-form articles illustrated with NASA
+photographs, its own pages, menus and journal issues, and five invented advertisers with animated
+HTML5 creatives. A website whose demo content failed then stays empty, and is never filled again by
 itself. `make up` starts the images it finds and never rebuilds them, so after pulling the
-repositories run `make build` first: the studio's image carries the demo content and the seeds.
+repositories run `make build` first: the studio's image carries the demo content, the template
+sets and the seeds.
 
 - **From scratch**, every website with its content (this also deletes the accounts, keys and
   data of every product; demo.env and demo.local.env stay): pull the six repositories, then
   `make build`, `make clean`, `make up`.
 - **Keeping the data**: pull, `make build`, `make up`, then fill each empty website:
   `make cms-seed SITE=demo`, `make cms-seed SITE=minimal` and `make cms-seed SITE=space DEMO=space`.
-  It refuses a website that has articles and writes nothing then. A stack started before
-  "Starward" existed creates it with `make cms-space` instead (`ORG=org_...` to put it in the demo
-  organisation, whose id the studio's Organisations screen shows).
+  It refuses a website that has articles and writes nothing then. It keeps the website's template
+  set, so Starward gets its design only in a `space` website that is already on magazine; any
+  other is replaced as below.
+- **Starward on a stack started before it, or with its earlier version** (on the editorial set,
+  without the photographs; `make verify` says "Starward renders on the magazine set: FAIL"): demo
+  content goes only into a website without articles, so the old one goes first.
+  1. Pull pacod-cms, then `make build` and `make up`.
+  2. In the studio, open Starward, *Settings → Delete this website*, and type its id, `space`.
+  3. Wait three minutes, until the id is free again, then `make cms-space`. It creates Starward on
+     the magazine set in the demo websites' organisation (`ORG=org_...` another).
+  4. `make baseline`. Until then `make reset`, and the nightly reset at `DEMO_RESET_TIME`, bring the
+     old Starward back: keep the whole procedure clear of that time. `make baseline` keeps
+     everything else as it is at that moment too, so run it right after the step above.
 
 ### HTTPS on a domain
 
