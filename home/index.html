@@ -13,8 +13,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>pacod demo</title>
-<meta name="description" content="The whole pacod stack on one machine: identity, AI gateway, agents, CMS and knowledge base.">
+<title>pacod demo · AI gateway, CMS and agent builder</title>
+<meta name="description" content="pacod, open source: a high-performance AI gateway, an AI-assisted CMS and an easy agent builder, working as one platform with one sign-in.">
 {{- with env "DEMO_HOME_GOOGLE_SITE_VERIFICATION" }}
 <meta name="google-site-verification" content="{{.}}">
 {{- end }}
@@ -151,8 +151,23 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 	.hero figcaption a { color: var(--muted); }
 	.hero-img { width: 100%; height: auto; border-radius: 16px; border: 1px solid var(--line); background: #0f1117; display: block; }
 
-	/* Jump list */
-	.jump { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 8px; padding-bottom: 8px; }
+	/* The three flagship products, under the intro. */
+	.flagships { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding-top: 8px; padding-bottom: 8px; }
+	.flag {
+		--accent: var(--pr);
+		display: block; text-decoration: none; background: var(--panel); border: 1px solid var(--line);
+		border-top: 3px solid var(--accent); border-radius: 14px; padding: 18px 20px;
+	}
+	.flag.gw { --accent: var(--gw); }
+	.flag:hover { border-color: var(--accent); }
+	.flag .head { margin-bottom: 0; }
+	.flag .head strong { font-size: 18px; }
+	.flag .kind { display: block; color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin: 12px 0 6px; }
+	.flag .what { display: block; font-size: 15px; color: var(--soft); }
+
+	/* Jump list: the foundation */
+	.jump { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 8px; padding-bottom: 8px; }
+	.jump .label { font-size: 13px; color: var(--muted); margin-right: 2px; }
 	.jump a {
 		display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 14px; font-weight: 600;
 		padding: 7px 12px 7px 7px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel);
@@ -197,6 +212,20 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 	.ext { font-size: 14px; color: var(--muted); margin-top: 6px; }
 	.ext a { color: var(--muted); }
 	.ext a:hover { color: var(--text); }
+	.product p.pitch { font-size: 17px; color: var(--text); }
+
+	/* A flagship's advantages: a row under the card, across both columns. */
+	.perks {
+		grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 28px;
+		list-style: none; margin: 0; padding: 26px 0 0; border-top: 1px solid var(--line);
+	}
+	.perks li { padding-left: 14px; border-left: 2px solid var(--accent); }
+	.perks strong { display: block; font-size: 15px; margin-bottom: 4px; }
+	.perks span { display: block; font-size: 14px; color: var(--muted); }
+
+	/* The foundation: two smaller cards side by side. */
+	.duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+	.product.compact { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 24px; margin-bottom: 0; }
 
 	/* Screenshots: a browser frame with the address; a second one overlaps the first's corner. */
 	.shots { position: relative; }
@@ -234,8 +263,10 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 
 	@media (max-width: 900px) {
 		.intro { grid-template-columns: 1fr; padding-top: 36px; gap: 28px; }
-		.jump { padding-top: 0; }
+		.flagships { grid-template-columns: 1fr; padding-top: 0; }
 		.product { grid-template-columns: 1fr; padding: 20px; gap: 24px; }
+		.perks { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 22px; }
+		.duo { grid-template-columns: 1fr; }
 		.shots.two { padding-bottom: 0; }
 		.shots.two .frame + .frame { position: static; width: 100%; margin-top: 16px; }
 		.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -244,6 +275,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 	@media (max-width: 560px) {
 		.wrap { padding-left: 16px; padding-right: 16px; }
 		.grid { grid-template-columns: 1fr; }
+		.perks { grid-template-columns: 1fr; }
 		.top .wrap { gap: 14px; }
 		.top nav { gap: 14px; }
 	}
@@ -262,6 +294,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 		<a class="brand" href="/">pacod <span>demo</span></a>
 		<nav>
 			<a href="#products">Products</a>
+			<a class="wide" href="#foundation">Identity &amp; KB</a>
 			<a href="#platform">Platform</a>
 			<a class="wide" href="#how">How it fits</a>
 			<a class="wide" href="https://ai.pacod.io">ai.pacod.io</a>
@@ -353,11 +386,11 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 	<div class="wrap intro">
 		<div>
 			<div class="eyebrow">pacod-demo · {{if $public}}{{$d}}{{else}}running on this machine{{end}}</div>
-			<h1>The whole pacod stack, working as one platform.</h1>
+			<h1>An AI gateway, a CMS and an agent builder, working as one platform.</h1>
 			<p class="lead">
-				Identity, the AI gateway, the agent platform, the CMS and the knowledge base: five
-				open-source projects behind one address, one sign-in for all of them, and every model call
-				through one gateway.
+				A high-performance AI gateway, a modern AI-assisted CMS and an agent builder that gives you
+				full control over the AI. All three are open source and work as one: one sign-in for every
+				product, and every model call through the gateway.
 			</p>
 			{{- if not $public}}
 			<div class="signin">
@@ -374,53 +407,43 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 		</figure>
 	</div>
 
-	<div class="wrap jump" aria-label="The products">
+	<div class="wrap flagships" aria-label="The flagship products">
+		<a class="flag gw" href="#pacod-gw">
+			<span class="head"><span class="badge">GW</span><strong>pacod-gw</strong></span>
+			<span class="kind">AI gateway</span>
+			<span class="what">Fast, scalable and flexible, with every call monitored and a console that is easy to use.</span>
+		</a>
+		<a class="flag" href="#pacod-cms">
+			<span class="head"><span class="badge">CM</span><strong>pacod-cms</strong></span>
+			<span class="kind">Content management</span>
+			<span class="what">Flexible and easy to use, with AI to write, translate and make PDFs.</span>
+		</a>
+		<a class="flag" href="#pacod-ap">
+			<span class="head"><span class="badge">AP</span><strong>pacod-ap</strong></span>
+			<span class="kind">Agent builder</span>
+			<span class="what">Build AI agents visually, with full control over models, tools, prompts and releases.</span>
+		</a>
+	</div>
+
+	<div class="wrap jump" aria-label="Also in the stack">
+		<span class="label">Also in the stack</span>
 		<a class="id" href="#pacod-id"><span class="badge">ID</span>pacod-id</a>
-		<a class="gw" href="#pacod-gw"><span class="badge">GW</span>pacod-gw</a>
-		<a href="#pacod-ap"><span class="badge">AP</span>pacod-ap</a>
-		<a href="#pacod-cms"><span class="badge">CM</span>pacod-cms</a>
 		<a href="#pacod-kb"><span class="badge">KB</span>pacod-kb</a>
 	</div>
 
 	<section class="section" id="products">
 		<div class="wrap">
-			<h2>The products</h2>
-			<p class="sub">Each is a complete product with its own repository; here they share one network, one database server and one sign-in.</p>
-
-			<!-- pacod-id -->
-			<article class="product id" id="pacod-id">
-				<div>
-					<div class="head"><span class="badge">ID</span><h3>pacod-id</h3></div>
-					<div class="role">Identity &amp; access</div>
-					<p>One place where people and machines sign in, and where it is recorded what they may do. An OpenID Connect provider for first-party applications: accounts, organisations, role bindings, and a change feed that products follow to decide access locally.</p>
-					<p>In the demo it is the one realm every product signs in with.</p>
-					<ul class="stack"><li>Rust</li><li>axum</li><li>PostgreSQL</li><li>OpenID Connect</li><li>SvelteKit</li></ul>
-					<div class="links">
-						<div class="label">In this demo</div>
-						<div class="btns">
-							<a class="btn primary" href="{{$s}}://id.{{$d}}{{$p}}/admin">Administration <span class="host">/admin</span></a>
-							<a class="btn" href="{{$s}}://id.{{$d}}{{$p}}/account">Your account</a>
-							<a class="btn" href="{{$s}}://id.{{$d}}{{$p}}/.well-known/openid-configuration">OIDC discovery</a>
-						</div>
-						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-id">Project page</a> · <a href="https://github.com/pacod22/pacod-id">Repository</a></div>
-					</div>
-				</div>
-				<div class="shots">
-					<a class="frame" href="{{$s}}://id.{{$d}}{{$p}}/admin">
-						<div class="bar"><i></i><i></i><i></i><span>id.{{$d}}{{$p}}/admin</span></div>
-						<img src="screenshots/id-admin.png" width="1280" height="800" loading="lazy" alt="pacod-id administration: the accounts list and the form to create an account">
-					</a>
-				</div>
-			</article>
+			<h2>The flagship products</h2>
+			<p class="sub">Each is a complete product with its own repository. Here they share one network, one database server and one sign-in.</p>
 
 			<!-- pacod-gw -->
 			<article class="product gw" id="pacod-gw">
 				<div>
 					<div class="head"><span class="badge">GW</span><h3>pacod-gw</h3></div>
 					<div class="role">AI gateway</div>
-					<p>Sits between applications and LLM providers. A Rust core relays or translates every call (OpenAI, Anthropic and Gemini formats), keeps provider keys out of the apps, enforces quotas, prices each request and streams usage into ClickHouse, managed from a SvelteKit console.</p>
-					<p>In the demo every product's model calls go through it; with no provider key set, its mock provider answers.</p>
-					<ul class="stack"><li>Rust</li><li>PostgreSQL</li><li>ClickHouse</li><li>SvelteKit</li></ul>
+					<p class="pitch">A first-class, high-performance gateway between your applications and every LLM provider, built for performance, scalability, flexibility, advanced monitoring and ease of use.</p>
+					<p>A Rust core relays or translates every call, keeps provider keys out of the apps, enforces quotas and prices each request. A SvelteKit console manages all of it. In the demo, every product's model calls go through it. With no provider key set, its mock provider answers.</p>
+					<ul class="stack"><li>Rust</li><li>Tokio &amp; hyper</li><li>PostgreSQL</li><li>ClickHouse</li><li>SvelteKit</li></ul>
 					<div class="links">
 						<div class="label">In this demo</div>
 						<div class="btns">
@@ -436,36 +459,14 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 						<img src="screenshots/gw-console.png" width="1280" height="800" loading="lazy" alt="The gateway console's dashboard: requests, errors, cost, tokens and gateway delay today">
 					</a>
 				</div>
-			</article>
-
-			<!-- pacod-ap -->
-			<article class="product" id="pacod-ap">
-				<div>
-					<div class="head"><span class="badge">AP</span><h3>pacod-ap</h3></div>
-					<div class="role">Agent-building platform</div>
-					<p>Any number of self-contained AI agents on one deployment. Each agent has its own knowledge base, reference facts, prompts, directives, conversations and reviews, behind one sign-in and one admin console, with a review loop that improves every agent.</p>
-					<p>The demo runs the <em>starter</em> agent, a small fictional help desk.</p>
-					<ul class="stack"><li>FastAPI</li><li>LangGraph</li><li>MCP</li><li>SvelteKit</li><li>PostgreSQL</li><li>Redis</li><li>Qdrant</li></ul>
-					<div class="links">
-						<div class="label">In this demo</div>
-						<div class="btns">
-							<a class="btn primary" href="{{$s}}://app.{{$d}}{{$p}}/dashboard">Admin console <span class="host">/dashboard</span></a>
-							<a class="btn" href="{{$s}}://app.{{$d}}{{$p}}/">Website</a>
-							<a class="btn" href="{{$s}}://app.{{$d}}{{$p}}/chat">Chat</a>
-						</div>
-						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-ap">Project page</a> · <a href="https://github.com/pacod22/pacod-ap">Repository</a></div>
-					</div>
-				</div>
-				<div class="shots two">
-					<a class="frame" href="{{$s}}://app.{{$d}}{{$p}}/dashboard">
-						<div class="bar"><i></i><i></i><i></i><span>app.{{$d}}{{$p}}/dashboard</span></div>
-						<img src="screenshots/ap-dashboard.png" width="1280" height="800" loading="lazy" alt="The agent platform's admin dashboard: indexed sources, tokens used, active users and answered requests">
-					</a>
-					<a class="frame" href="{{$s}}://app.{{$d}}{{$p}}/">
-						<div class="bar"><i></i><i></i><i></i><span>app.{{$d}}{{$p}}</span></div>
-						<img src="screenshots/ap-site.png" width="1280" height="800" loading="lazy" alt="The agent platform's public website: Build and run your own AI agents">
-					</a>
-				</div>
+				<ul class="perks">
+					<li><strong>Performance</strong><span>Rust on Tokio and hyper. Responses stream straight through, configuration is an in-memory snapshot read with one atomic load, and keys are checked without touching a database. Proxy mode relays content untouched.</span></li>
+					<li><strong>Scalability</strong><span>Several instances share one database, and a change reaches all of them within about a second. Limits are counted in memory and usage events are spooled to disk before they reach ClickHouse. It runs as one container without a database (lite), or at scale with a Helm chart.</span></li>
+					<li><strong>Flexibility</strong><span>OpenAI, Anthropic (in full) and Gemini dialects, translated in every direction. Providers include OpenAI, Anthropic, Gemini and Vertex AI, DeepSeek, GLM, Kimi and Ollama. Proxy mode forwards content byte for byte, and managed mode adds templates.</span></li>
+					<li><strong>Smart routing</strong><span>Model pools with priority, weighted, round-robin, least-busy, lowest-latency or cheapest routing. Calls fail over before the first byte, circuit breakers isolate failing models, and session affinity keeps prompt caches warm.</span></li>
+					<li><strong>Advanced monitoring</strong><span>The delay the gateway adds is measured and stored for every call. Usage, tokens and cost go to ClickHouse, with Prometheus metrics, Grafana dashboards and alerts, and an audit mode that keeps complete requests and responses.</span></li>
+					<li><strong>Usability</strong><span>One console for models, templates, keys, versioned prices, quotas and reports. Changes take effect live, without a restart. A built-in tester runs test cases and load tests against the gateway.</span></li>
+				</ul>
 			</article>
 
 			<!-- pacod-cms -->
@@ -473,8 +474,9 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 				<div>
 					<div class="head"><span class="badge">CM</span><h3>pacod-cms</h3></div>
 					<div class="role">Content management</div>
-					<p>A CMS for editorial websites: articles, authors and categories, standing pages, an image library, advertising with an HTML5 banner builder, PDFs and journal issues, statistics, and multilingual content with AI translation. One installation hosts many websites, each with its own database, files and cache.</p>
-					<p>The demo has three websites, one per template set: <em>Demo Journal</em> (editorial), <em>Demo Notes</em> (minimal) and <em>Starward</em> (magazine), an image-led space-travel magazine for an invented star system, with NASA photographs and animated HTML5 advertising.</p>
+					<p class="pitch">A modern, highly flexible and user-friendly CMS, with AI-assisted tools throughout: content generation, translation and PDF creation.</p>
+					<p>Articles, authors and categories, standing pages, an image library, advertising and statistics for editorial websites. One installation hosts many websites, each with its own database, files and cache.</p>
+					<p>The demo has three websites, one per template set: <em>Demo Journal</em> (editorial), <em>Demo Notes</em> (minimal) and <em>Starward</em> (magazine). Starward is an image-led space-travel magazine for an invented star system, with NASA photographs and animated HTML5 advertising.</p>
 					<ul class="stack"><li>Java 25</li><li>Spring Boot</li><li>Thymeleaf</li><li>MongoDB</li><li>Gotenberg</li></ul>
 					<div class="links">
 						<div class="label">In this demo</div>
@@ -505,31 +507,109 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 						</a>
 					</div>
 				</div>
+				<ul class="perks">
+					<li><strong>AI content generation</strong><span>Draft a whole article from a brief, continue in the voice of the text around the cursor, and rewrite a passage six ways. It also suggests titles, summaries and tags, and writes alt text by looking at the picture itself.</span></li>
+					<li><strong>AI translation</strong><span>Articles, pages, menus, categories and tags are translated as background jobs. Each answer is rejected unless it keeps the article's markup exactly, and an edit made while a job runs is never overwritten.</span></li>
+					<li><strong>PDFs and journal issues</strong><span>One PDF per article and language, in a standard or two-column scientific layout, with the abstract, keywords and running title written by AI if you choose. Whole journal issues come with a cover, editorial, contents and bookmarks.</span></li>
+					<li><strong>Design without code</strong><span>Template sets, drag-and-drop layouts and themes with night-mode colours, or let AI draft a theme or layout from a brief. Everything stays a draft, previewed at desktop, tablet or phone width, until it is published.</span></li>
+					<li><strong>Many websites, one studio</strong><span>Organisations, websites, members and roles per website, in a studio available in English, Bulgarian, German and Russian. Each website is isolated in its own database, folder and cache, at its own domains.</span></li>
+					<li><strong>Advertising and statistics</strong><span>Ad bookings with an HTML5 banner builder, with served, viewable and clicked counts. Reader statistics without cookies, a crawler log that verifies Googlebot, and a link-in-bio page.</span></li>
+				</ul>
 			</article>
 
-			<!-- pacod-kb -->
-			<article class="product" id="pacod-kb">
+			<!-- pacod-ap -->
+			<article class="product" id="pacod-ap">
 				<div>
-					<div class="head"><span class="badge">KB</span><h3>pacod-kb</h3></div>
-					<div class="role">RAG knowledge base</div>
-					<p>A document knowledge base for retrieval-augmented generation: it ingests files and web pages, converts them to canonical Markdown, indexes them for hybrid semantic and keyword search, keeps every version, and hands models chunks with a stable metadata contract. CPU only, with built-in prompt-injection defence.</p>
-					<ul class="stack"><li>FastAPI</li><li>Qdrant</li><li>BGE-M3</li><li>BM25</li><li>HTMX</li></ul>
+					<div class="head"><span class="badge">AP</span><h3>pacod-ap</h3></div>
+					<div class="role">Agent builder</div>
+					<p class="pitch">An easy-to-use platform for building AI agents, with full control over the AI: what each agent knows, which models and tools it uses, what it may say, and how it improves.</p>
+					<p>Any number of self-contained AI agents on one deployment. Each has its own knowledge base, reference facts, prompts, directives, conversations and reviews, behind one sign-in and one admin console.</p>
+					<p>The demo runs the <em>starter</em> agent, a small fictional help desk.</p>
+					<ul class="stack"><li>FastAPI</li><li>LangGraph</li><li>MCP</li><li>SvelteKit</li><li>PostgreSQL</li><li>Redis</li><li>Qdrant</li></ul>
 					<div class="links">
 						<div class="label">In this demo</div>
 						<div class="btns">
-							<a class="btn primary" href="{{$s}}://kb.{{$d}}{{$p}}/kb">Knowledge base <span class="host">/kb</span></a>
-							<a class="btn" href="{{$s}}://kb.{{$d}}{{$p}}/kb/users">Members</a>
+							<a class="btn primary" href="{{$s}}://app.{{$d}}{{$p}}/dashboard">Admin console <span class="host">/dashboard</span></a>
+							<a class="btn" href="{{$s}}://app.{{$d}}{{$p}}/">Website</a>
+							<a class="btn" href="{{$s}}://app.{{$d}}{{$p}}/chat">Chat</a>
 						</div>
-						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-kb">Project page</a> · <a href="https://github.com/pacod22/pacod-kb">Repository</a></div>
+						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-ap">Project page</a> · <a href="https://github.com/pacod22/pacod-ap">Repository</a></div>
 					</div>
 				</div>
-				<div class="shots">
-					<a class="frame" href="{{$s}}://kb.{{$d}}{{$p}}/kb">
-						<div class="bar"><i></i><i></i><i></i><span>kb.{{$d}}{{$p}}/kb</span></div>
-						<img src="screenshots/kb.png" width="1280" height="800" loading="lazy" alt="The knowledge base's home: dashboard, ingest, search, documents and Qdrant">
+				<div class="shots two">
+					<a class="frame" href="{{$s}}://app.{{$d}}{{$p}}/dashboard">
+						<div class="bar"><i></i><i></i><i></i><span>app.{{$d}}{{$p}}/dashboard</span></div>
+						<img src="screenshots/ap-dashboard.png" width="1280" height="800" loading="lazy" alt="The agent platform's admin dashboard: indexed sources, tokens used, active users and answered requests">
+					</a>
+					<a class="frame" href="{{$s}}://app.{{$d}}{{$p}}/">
+						<div class="bar"><i></i><i></i><i></i><span>app.{{$d}}{{$p}}</span></div>
+						<img src="screenshots/ap-site.png" width="1280" height="800" loading="lazy" alt="The agent platform's public website: Build and run your own AI agents">
 					</a>
 				</div>
+				<ul class="perks">
+					<li><strong>Visual agent editor</strong><span>Build an agent as a pipeline of components and set each step in a form, with no code. Existing agents can be brought into the editor without changing how they behave.</span></li>
+					<li><strong>AI that helps you build</strong><span>The editor's assistant drafts prompts, scope descriptions and guard messages from your instructions. Each suggestion is validated like a saved draft, and you decide what to apply.</span></li>
+					<li><strong>Full AI control</strong><span>For each agent you choose the models, the allowed tools, the planner, the topic guard and the languages. Directives take precedence even over what the tools return.</span></li>
+					<li><strong>Safe releases</strong><span>Versions never change once saved. Test a draft against its own dev deployment, publish it when it is ready, and roll back in one step.</span></li>
+					<li><strong>Grounded answers</strong><span>Every agent has its own knowledge base and curated knowledge, reference facts and MCP tools, and answers from them. Each agent's knowledge, conversations and settings stay its own.</span></li>
+					<li><strong>Improves continuously</strong><span>A review loop finds failed answers in recent conversations and proposes fixes: knowledge, facts and test cases. By default, a person approves them before they reach the live agent. Every model call is costed by the gateway.</span></li>
+				</ul>
 			</article>
+		</div>
+	</section>
+
+	<section class="section" id="foundation">
+		<div class="wrap">
+			<h2>Also in the stack</h2>
+			<p class="sub">pacod-id signs everyone in to every product. pacod-kb, a RAG knowledge base, runs beside them.</p>
+			<div class="duo">
+				<!-- pacod-id -->
+				<article class="product id compact" id="pacod-id">
+					<div>
+						<div class="head"><span class="badge">ID</span><h3>pacod-id</h3></div>
+						<div class="role">Identity &amp; access</div>
+						<p>One sign-in for people and machines. An OpenID Connect provider with accounts, organisations and role bindings, plus a change feed that every product follows to decide access locally. In the demo it is the one realm every product signs in with.</p>
+						<ul class="stack"><li>Rust</li><li>axum</li><li>PostgreSQL</li><li>OpenID Connect</li><li>SvelteKit</li></ul>
+						<div class="links">
+							<div class="btns">
+								<a class="btn primary" href="{{$s}}://id.{{$d}}{{$p}}/admin">Administration <span class="host">/admin</span></a>
+								<a class="btn" href="{{$s}}://id.{{$d}}{{$p}}/account">Your account</a>
+								<a class="btn" href="{{$s}}://id.{{$d}}{{$p}}/.well-known/openid-configuration">OIDC discovery</a>
+							</div>
+							<div class="ext"><a href="https://ai.pacod.io/projects/pacod-id">Project page</a> · <a href="https://github.com/pacod22/pacod-id">Repository</a></div>
+						</div>
+					</div>
+					<div class="shots">
+						<a class="frame" href="{{$s}}://id.{{$d}}{{$p}}/admin">
+							<div class="bar"><i></i><i></i><i></i><span>id.{{$d}}{{$p}}/admin</span></div>
+							<img src="screenshots/id-admin.png" width="1280" height="800" loading="lazy" alt="pacod-id administration: the accounts list and the form to create an account">
+						</a>
+					</div>
+				</article>
+
+				<!-- pacod-kb -->
+				<article class="product compact" id="pacod-kb">
+					<div>
+						<div class="head"><span class="badge">KB</span><h3>pacod-kb</h3></div>
+						<div class="role">RAG knowledge base</div>
+						<p>Ingests files and web pages, converts them to canonical Markdown and indexes them for hybrid semantic and keyword search. It keeps every version and hands models chunks with stable metadata. CPU only, with built-in prompt-injection defence.</p>
+						<ul class="stack"><li>FastAPI</li><li>Qdrant</li><li>BGE-M3</li><li>BM25</li><li>HTMX</li></ul>
+						<div class="links">
+							<div class="btns">
+								<a class="btn primary" href="{{$s}}://kb.{{$d}}{{$p}}/kb">Knowledge base <span class="host">/kb</span></a>
+								<a class="btn" href="{{$s}}://kb.{{$d}}{{$p}}/kb/users">Members</a>
+							</div>
+							<div class="ext"><a href="https://ai.pacod.io/projects/pacod-kb">Project page</a> · <a href="https://github.com/pacod22/pacod-kb">Repository</a></div>
+						</div>
+					</div>
+					<div class="shots">
+						<a class="frame" href="{{$s}}://kb.{{$d}}{{$p}}/kb">
+							<div class="bar"><i></i><i></i><i></i><span>kb.{{$d}}{{$p}}/kb</span></div>
+							<img src="screenshots/kb.png" width="1280" height="800" loading="lazy" alt="The knowledge base's home: dashboard, ingest, search, documents and Qdrant">
+						</a>
+					</div>
+				</article>
+			</div>
 		</div>
 	</section>
 
