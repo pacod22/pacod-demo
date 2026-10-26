@@ -127,12 +127,14 @@ verify:
 # stack keeps what it made, `make baseline` what there is now. `make reset` returns every product to
 # it, then runs the bootstrap again, which applies what demo.local.env has gained since (a provider
 # key). The scheduler does `make reset` every day at DEMO_RESET_TIME in DEMO_RESET_TIMEZONE
-# (demo.env); the home page says when.
+# (demo.env); the home page says when. Both start the stack again, so both make the secrets first,
+# as make up does: a repository pulled since the last make up may need one the demo has not made
+# yet (pacod-gw's PGW_VALKEY_PASSWORD), and its preflight would stop the start without it.
 
 reset-image:
 	@docker image inspect $(RESET) >/dev/null 2>&1 || docker build -q -t $(RESET) tools/reset/ >/dev/null
 
-baseline: render reset-image
+baseline: init render reset-image
 	@sh scripts/baseline.sh save
 	@$(MAKE) --no-print-directory scheduler
 
@@ -141,7 +143,7 @@ first-baseline:
 	@if [ -f .state/baseline-pending ] && sh scripts/baseline.sh wait-cms; then \
 		$(MAKE) --no-print-directory baseline && rm -f .state/baseline-pending; fi
 
-reset: render reset-image
+reset: init render reset-image
 	@sh scripts/baseline.sh restore
 	@$(MAKE) --no-print-directory bootstrap
 	@$(MAKE) --no-print-directory google

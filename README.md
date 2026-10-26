@@ -162,7 +162,8 @@ the visitor's own zone and how long until the next reset; `make urls` says it to
 - **What it holds**: every data volume of the stack (PostgreSQL, MongoDB, Qdrant, ClickHouse,
   Redis, the knowledge base's and the app's files, Grafana, Alertmanager), the CMS's files
   (`.state/cms/storage`) and the bootstrap's credentials. Not the models, Prometheus's metrics or
-  the edge's own data. It is kept, compressed, in the Docker volume `pacod-demo-baseline`;
+  the edge's own data, nor the gateway's response cache, which is kept in memory only: every reset
+  empties it. It is kept, compressed, in the Docker volume `pacod-demo-baseline`;
   `make clean` deletes it with the rest.
 - **`make reset`** does the same as the nightly reset, now. Both stop every service but the edge
   (the home page stays up), put the baseline back, start the stack and run the bootstrap again,
@@ -213,6 +214,20 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
 `demo.local.env`, then
 `make bootstrap`: the gateway is set up with the real providers.
 
+## Updating
+
+After pulling this repository and the five products:
+
+```sh
+make build      # make up builds only missing images: without this the old ones keep running
+make up         # also makes any secret a new release needs (pacod-gw's PGW_VALKEY_PASSWORD)
+make reset      # the original data, migrated by the new releases...
+make baseline   # ...kept as the state every nightly reset returns to
+```
+
+Without the last two steps every reset puts back the older releases' data, which the products then
+migrate again at each start.
+
 ## How it is put together
 
 - **One network, unique names.** All five repositories follow one convention
@@ -231,8 +246,9 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
   collector). Each `extends` the definition a repository already ships, and takes the products'
   contributions from their `platform/` directories: their Caddy site blocks, database scripts,
   Prometheus jobs, rules and dashboards.
-- **Product-owned stores stay with their product**: the gateway's ClickHouse (analytics), the
-  CMS's MongoDB (one database per website) and Gotenberg (PDFs), the app's Redis and pgbouncer.
+- **Product-owned stores stay with their product**: the gateway's ClickHouse (analytics) and
+  Valkey (its response cache), the CMS's MongoDB (one database per website) and Gotenberg (PDFs),
+  the app's Redis and pgbouncer.
 - **Generated state** lives in `.state/` (git-ignored): the secrets (made once, never changed),
   the credentials the bootstrap makes (gateway keys, service tokens), and each product's
   variables rendered from `demo.env` ([scripts/render-env.sh](scripts/render-env.sh)).

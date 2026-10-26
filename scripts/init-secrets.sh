@@ -57,6 +57,8 @@ need PGW_KEK b64 32
 need PGW_KEY_PEPPER hex 24
 need PGW_INTERNAL_TOKEN hex 24
 need CLICKHOUSE_PASSWORD hex 16
+# Valkey, the response cache's store (gw-valkey).
+need PGW_VALKEY_PASSWORD hex 24
 need GRAFANA_ADMIN_PASSWORD alnum 24
 
 # pacod-ap.

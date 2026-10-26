@@ -57,9 +57,10 @@ containers are still reachable only from each other and through the one publishe
 | Name | Why it stays with its product |
 |---|---|
 | `gw-clickhouse` | the gateway's columnar analytics store; PostgreSQL cannot replace it |
+| `gw-valkey` | the gateway's response cache: the answers its instances share, in memory only and behind a password of its own, the least recently used dropped first |
 | `cms-mongo` | cms's data model is MongoDB, with one database per website |
 | `cms-gotenberg` | cms's PDF renderer; nothing else uses it |
-| `ap-redis` | only ap uses a cache |
+| `ap-redis` | ap's own caches and counters; the gateway's answers stay in `gw-valkey` |
 | `ap-pgbouncer` | ap's connection pooler, in front of `pacod-postgres` |
 
 ### Addresses products use for shared components

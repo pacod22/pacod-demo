@@ -2,11 +2,14 @@
 # docker-compose.dev.yml: the image builds and the mock provider gw-mock) to the full stack:
 # sign-in through the shared pacod-id (PGW_AUTH=oidc), the demo's secrets instead of the
 # development ones, and no published ports (the edge serves the console and the data plane).
+# The response cache's Valkey (gw-valkey) gets the demo's password too: the gateway's preflight,
+# the store and the gateway must agree on it.
 services:
   gw-preflight:
     environment:
       GW_DB_PASSWORD: ${GW_DB_PASSWORD}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      PGW_VALKEY_PASSWORD: ${PGW_VALKEY_PASSWORD}
       PGW_KEK: ${PGW_KEK}
       PGW_KEK_ID: default
       PGW_KEY_PEPPER: ${PGW_KEY_PEPPER}
@@ -21,10 +24,16 @@ services:
     environment:
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
 
+  gw-valkey:
+    ports: !reset []
+    environment:
+      VALKEY_PASSWORD: ${PGW_VALKEY_PASSWORD}
+
   pacod-gw:
     ports: !reset []
     environment:
       DATABASE_URL: postgres://pacod_gw:${GW_DB_PASSWORD}@pacod-postgres:5432/pacod_gw
+      PGW_VALKEY_PASSWORD: ${PGW_VALKEY_PASSWORD}
       PGW_KEK: ${PGW_KEK}
       PGW_KEK_ID: default
       PGW_KEY_PEPPER: ${PGW_KEY_PEPPER}

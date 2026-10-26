@@ -443,7 +443,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 					<div class="role">AI gateway</div>
 					<p class="pitch">A first-class, high-performance gateway between your applications and every LLM provider, built for performance, scalability, flexibility, advanced monitoring and ease of use.</p>
 					<p>A Rust core relays or translates every call, keeps provider keys out of the apps, enforces quotas and prices each request. A SvelteKit console manages all of it. In the demo, every product's model calls go through it. With no provider key set, its mock provider answers.</p>
-					<ul class="stack"><li>Rust</li><li>Tokio &amp; hyper</li><li>PostgreSQL</li><li>ClickHouse</li><li>SvelteKit</li></ul>
+					<ul class="stack"><li>Rust</li><li>Tokio &amp; hyper</li><li>PostgreSQL</li><li>ClickHouse</li><li>Valkey</li><li>SvelteKit</li></ul>
 					<div class="links">
 						<div class="label">In this demo</div>
 						<div class="btns">
@@ -460,12 +460,12 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 					</a>
 				</div>
 				<ul class="perks">
-					<li><strong>Performance</strong><span>Rust on Tokio and hyper. Responses stream straight through, configuration is an in-memory snapshot read with one atomic load, and keys are checked without touching a database. Proxy mode relays content untouched.</span></li>
+					<li><strong>Performance</strong><span>Rust on Tokio and hyper. Responses stream straight through, configuration is an in-memory snapshot read with one atomic load, and keys are checked without touching a database. Proxy mode relays content untouched. A call at temperature 0 that repeats is answered from a response cache in Valkey, shared by every instance, without asking the provider.</span></li>
 					<li><strong>Scalability</strong><span>Several instances share one database, and a change reaches all of them within about a second. Limits are counted in memory and usage events are spooled to disk before they reach ClickHouse. It runs as one container without a database (lite), or at scale with a Helm chart.</span></li>
-					<li><strong>Flexibility</strong><span>OpenAI, Anthropic (in full) and Gemini dialects, translated in every direction. Providers include OpenAI, Anthropic, Gemini and Vertex AI, DeepSeek, GLM, Kimi and Ollama. Proxy mode forwards content byte for byte, and managed mode adds templates.</span></li>
+					<li><strong>Flexibility</strong><span>OpenAI (chat and Responses), Anthropic (in full) and Gemini dialects, translated in every direction. Beyond chat: embeddings, speech, images, transcription, rerank, Realtime sessions, and files and batches. Providers include OpenAI, Anthropic, Gemini and Vertex AI, DeepSeek, GLM, Kimi, Groq, Cohere, Jina, Voyage and Ollama. Proxy mode forwards content byte for byte, WebSockets included, and managed mode adds templates.</span></li>
 					<li><strong>Smart routing</strong><span>Model pools with priority, weighted, round-robin, least-busy, lowest-latency or cheapest routing. Calls fail over before the first byte, circuit breakers isolate failing models, and session affinity keeps prompt caches warm.</span></li>
 					<li><strong>Advanced monitoring</strong><span>The delay the gateway adds is measured and stored for every call. Usage, tokens and cost go to ClickHouse, with Prometheus metrics, Grafana dashboards and alerts, and an audit mode that keeps complete requests and responses.</span></li>
-					<li><strong>Usability</strong><span>One console for models, templates, keys, versioned prices, quotas and reports. Changes take effect live, without a restart. A built-in tester runs test cases and load tests against the gateway.</span></li>
+					<li><strong>Usability</strong><span>One console for models, templates, keys, versioned prices, quotas and reports, down to what the response cache saved. Changes take effect live, without a restart. A built-in tester runs test cases and load tests against the gateway.</span></li>
 				</ul>
 			</article>
 

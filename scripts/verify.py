@@ -258,10 +258,50 @@ def gateway() -> None:
         n = len(body.get("data", [])) if isinstance(body, dict) else 0
         report(status == 200 and n > 0, f"{product}: lists models", f"{status}, {n} models")
         mock_script(f"pong from {product}")
-        status, body, _ = http("POST", "http://pacod-gw:8080/v1/chat/completions", headers=auth, timeout=60,
+        # Past the response cache: every product's call reaches the provider.
+        status, body, _ = http("POST", "http://pacod-gw:8080/v1/chat/completions", timeout=60,
+                               headers={**auth, "x-gw-cache": "off"},
                                body={"model": model, "messages": [{"role": "user", "content": "ping"}]})
         text = body["choices"][0]["message"]["content"] if status == 200 else str(body)[:120]
         report(status == 200, f"{product}: a chat completion", f"{status} {text[:50]!r}")
+    response_cache(creds.get("GATEWAY_KEY_API"), model)
+
+
+def response_cache(key: str | None, model: str) -> None:
+    """The response cache, on by default (pacod-gw's docs/plugin-concept.md, section 15): the same
+    call at temperature 0 twice; the second is answered from gw-valkey, without the provider."""
+    if not key:
+        return
+    auth = {"Authorization": f"Bearer {key}"}
+    body = {"model": model, "temperature": 0,
+            "messages": [{"role": "user", "content": f"Remember this answer (verify {uuid.uuid4().hex[:8]})."}]}
+    # One reply for each call that may reach the mock; what is left is removed below, so that no
+    # visitor's call gets it.
+    mock_script(*["kept by the response cache"] * 11)
+    try:
+        status, first, hdrs = http("POST", "http://pacod-gw:8080/v1/chat/completions", headers=auth,
+                                   body=body, timeout=60)
+        result = hdrs.get("x-gw-cache") if hdrs else None
+        if status != 200 or result != "miss":
+            report(False, "response cache: a new call is a miss",
+                   f"{status}, x-gw-cache {result}" + ("" if result else " (the cache is not bound: switched off?)"))
+            return
+        # The answer is kept once the call has settled, off the request path.
+        for _ in range(10):
+            time.sleep(0.5)
+            status, again, hdrs = http("POST", "http://pacod-gw:8080/v1/chat/completions", headers=auth,
+                                       body=body, timeout=60)
+            result = hdrs.get("x-gw-cache") if hdrs else None
+            if status != 200 or result == "hit":
+                break
+    finally:
+        http("DELETE", "http://gw-mock:9000/__mock/script")
+    content = lambda r: r["choices"][0]["message"]["content"]  # noqa: E731
+    same = status == 200 and content(again) == content(first)
+    attempts = hdrs.get("x-gw-attempts") if hdrs else None
+    report(result == "hit" and attempts == "0" and same, "response cache: the repeated call is a hit (gw-valkey)",
+           f"{status}, x-gw-cache {result}, {attempts} attempts, age {hdrs.get('Age') if hdrs else None} s"
+           + ("" if same or status != 200 else ", another answer"))
 
 
 # ---- 5. The app: one streamed chat turn -----------------------------------------------------------
