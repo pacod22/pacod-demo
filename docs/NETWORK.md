@@ -4,27 +4,62 @@ All pacod repos (`pacod-id`, `pacod-gw`, `pacod-ap`, `pacod-cms`, `pacod-kb`) fo
 convention, so their compose files can run on their own or be put together into one full stack
 (`pacod-demo`) without editing them.
 
-## 1. One network: `pacod-net`
+## 1. Two networks: `pacod-net` and `pacod-admin-net`
 
-- Every service in every compose file joins the external Docker network `pacod-net`, and only it.
+- Every service in every compose file joins the external Docker network `pacod-net`.
   There are no project networks, no `agent-net`, `pacod-link`, `pacod-cms-net`, `kb-id`, `kb-ai`,
   `backend`, `edge`, `egress` or `id-edge`.
+- The listeners that only servers reach are on the second external network, `pacod-admin-net`,
+  which is **internal** (no route out). Today these are the gateway's management API and
+  pacod-id's internal listener. The services that call them join it as well; nothing else does.
+- **A listener on `pacod-admin-net` binds to an alias**, never to `0.0.0.0`. Its service has the
+  alias on `pacod-admin-net` alone (`pacod-gw-admin`, `pacod-id-internal`), and the listen
+  variable names it (`PGW_ADMIN_LISTEN=pacod-gw-admin:8081`,
+  `PID_INTERNAL_LISTEN=pacod-id-internal:8071`). A container that listens on `0.0.0.0` is reachable
+  on every network it joins, so the binding, not the network, keeps the rest of `pacod-net` out.
+- **Clients call the alias**, never `pacod-gw:8081` or `pacod-id:8071`. A container on both
+  networks may resolve a service name to either of its addresses, and nothing listens there on
+  the `pacod-net` one.
+- A development file that publishes such a port to the host keeps `0.0.0.0`: a published port
+  never reaches an internal network. The full stack publishes neither and binds both to their
+  aliases (`overlays/gw.yml`, `overlays/id.yml`). `make verify` checks that `pacod-net` alone
+  reaches neither and that only their callers join `pacod-admin-net`.
 - Exception: the multi-machine and load-test overlays of pacod-gw (`hub`, `node`, `scale`,
   `load-agent`, `load`) keep the extra networks they need between machines.
-- Compose declares it as
+- Compose declares them as
 
   ```yaml
   networks:
     pacod-net:
       external: true
+    pacod-admin-net:
+      external: true
   ```
 
-- Every repo's Makefile creates it before `up`, idempotently:
-  `docker network inspect pacod-net >/dev/null 2>&1 || docker network create pacod-net`.
+  and a service with a listener there as
+
+  ```yaml
+  networks:
+    pacod-net:
+    pacod-admin-net:
+      aliases: [pacod-gw-admin]
+  ```
+
+- Every repo's Makefile creates them before `up`, idempotently, and stops when
+  `pacod-admin-net` exists without being internal (compose never checks that):
+
+  ```sh
+  docker network inspect pacod-net >/dev/null 2>&1 || docker network create pacod-net
+  docker network inspect pacod-admin-net >/dev/null 2>&1 || docker network create --internal pacod-admin-net
+  test "$(docker network inspect -f '{{.Internal}}' pacod-admin-net)" = true
+  ```
 
 **Trade-off.** One flat network gives up pacod-gw's `internal` backend network (databases without
 egress) and pacod-kb's separation of the pipeline from pacod-id. On a single machine the
 containers are still reachable only from each other and through the one published edge.
+`pacod-admin-net` keeps the two server-only listeners from the rest of `pacod-net`; it is shared
+too, so every caller on it reaches both, where Kubernetes network policies admit each listener's
+own clients only.
 
 ## 2. One name per service, unique across all repos
 
@@ -45,8 +80,8 @@ containers are still reachable only from each other and through the one publishe
 | `pacod-db-init` | one-shot: runs every `platform/postgres/*-db.sh` against `pacod-postgres` | - | gw, ap, cms, kb, id |
 | `pacod-qdrant` | Qdrant v1.19.2 | 6333, 6334 | ap, kb |
 | `pacod-embeddings` | bge-m3 embeddings + reranker (`/embed`, `/rerank`) | 8080 | defined in ap's app file |
-| `pacod-id` | identity provider | 8070 public, 8071 internal, 9170 metrics | gw, ap, cms, kb (pacod-id: its app file) |
-| `pacod-gw` | the gateway: full core, or gw-lite in cms/kb standalone | 8080 data plane, 8081 management, 9100 metrics | cms, kb (lite) (pacod-gw: its app file) |
+| `pacod-id` | identity provider | 8070 public, 8071 internal (`pacod-id-internal` on `pacod-admin-net`), 9170 metrics | gw, ap, cms, kb (pacod-id: its app file) |
+| `pacod-gw` | the gateway: full core, or gw-lite in cms/kb standalone | 8080 data plane, 8081 management (`pacod-gw-admin` on `pacod-admin-net`), 9100 metrics | cms, kb (lite) (pacod-gw: its app file) |
 | `gw-mock` | the gateway's mock LLM provider | 9000 | gw (dev), cms, kb |
 | `pacod-mailpit` | mail sink | 1025 SMTP, 8025 web | id, gw, ap, cms, kb |
 | `pacod-prometheus`, `pacod-alertmanager`, `pacod-grafana`, `pacod-otel` | monitoring | 9090, 9093, 3000, 4317/4318 | gw, ap |
@@ -69,9 +104,9 @@ The variable names stay what each product already calls them; only their default
 
 | Component | Default address | Variables |
 |---|---|---|
-| pacod-id, internal | `http://pacod-id:8071` | ap `ID_INTERNAL_URL`, gw `PGW_ID_INTERNAL_URL`, cms and kb `PACOD_ID_INTERNAL_URL` |
+| pacod-id, internal | `http://pacod-id-internal:8071` (on `pacod-admin-net`) | ap `ID_INTERNAL_URL`, gw `PGW_ID_INTERNAL_URL`, cms and kb `PACOD_ID_INTERNAL_URL` |
 | pacod-gw, data plane | `http://pacod-gw:8080` | ap `GATEWAY_URL`, cms and kb `PACOD_GW_URL` |
-| pacod-gw, management | `http://pacod-gw:8081` | ap `GATEWAY_ADMIN_URL`, gw `GATEWAY_API_URL`, `PGW_CORE_ADMIN_URL` |
+| pacod-gw, management | `http://pacod-gw-admin:8081` (on `pacod-admin-net`) | ap `GATEWAY_ADMIN_URL`, gw `GATEWAY_API_URL`, `PGW_CORE_ADMIN_URL` |
 | PostgreSQL | `pacod-postgres:5432` | ap via `ap-pgbouncer`, kb `KB_DATABASE_HOST`, gw `DATABASE_URL`, id `PID_DATABASE_URL` |
 | Qdrant | `http://pacod-qdrant:6333` | ap and kb `QDRANT_URL` |
 | Embeddings | `http://pacod-embeddings:8080` | ap `EMBEDDINGS_URL`; kb `EMBEDDINGS_URL` (unset: in-process model) |

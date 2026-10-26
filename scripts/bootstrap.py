@@ -49,7 +49,8 @@ gw.SERVICES = [
 ]
 
 ISSUER = os.environ["PACOD_ID_ISSUER"]
-ADMIN_URL = "http://pacod-gw:8081"
+# The management API listens on pacod-admin-net alone, under this alias.
+ADMIN_URL = "http://pacod-gw-admin:8081"
 DATA_URL = "http://pacod-gw:8080"
 
 

@@ -230,10 +230,12 @@ migrate again at each start.
 
 ## How it is put together
 
-- **One network, unique names.** All five repositories follow one convention
+- **Two networks, unique names.** All five repositories follow one convention
   ([docs/NETWORK.md](docs/NETWORK.md)): every container joins the external network `pacod-net`
   under a name unique across the repositories. Shared components are `pacod-*`; everything else
-  carries its owner's prefix (`gw-`, `ap-`, `cms-`, `kb-`).
+  carries its owner's prefix (`gw-`, `ap-`, `cms-`, `kb-`). The gateway's management API and
+  pacod-id's internal listener are on the internal network `pacod-admin-net` alone, as
+  `pacod-gw-admin:8081` and `pacod-id-internal:8071`, and only their callers join it.
 - **The repositories' own compose files.** Each repository splits its compose setup into an
   app file (its own services) and a standalone file (its own copies of the shared components,
   for running it alone). [compose.yml](compose.yml) includes the five app files unchanged; a

@@ -128,7 +128,7 @@ def health() -> None:
     for name, url in [
         ("pacod-id ready", "http://pacod-id:9170/readyz"),
         ("pacod-gw data plane ready", "http://pacod-gw:8080/readyz"),
-        ("pacod-gw management ready", "http://pacod-gw:8081/readyz"),
+        ("pacod-gw management ready (pacod-admin-net)", "http://pacod-gw-admin:8081/readyz"),
         ("gw-analytics ready", "http://gw-analytics:8090/readyz"),
         ("gw-tester", "http://gw-tester:8095/healthz"),
         ("ap-api", "http://ap-api:8000/health"),

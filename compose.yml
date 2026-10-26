@@ -5,6 +5,7 @@
 #
 # Every container is on the external network pacod-net and has a name that is unique across
 # the repositories (docs/NETWORK.md), which is what lets these files be put together unchanged.
+# The listeners only servers reach, and their callers, are on pacod-admin-net as well.
 name: pacod-demo
 
 include:

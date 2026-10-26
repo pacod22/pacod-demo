@@ -10,6 +10,9 @@ services:
       - ${DEMO_HOME}/config/pacod-id.toml:/etc/pacod-id/pacod-id.toml:ro
     environment:
       PID_TRUSTED_PROXIES: private_ranges
+      # pacod-id's app file keeps 0.0.0.0 for its port 26071, which the demo does not publish:
+      # the internal listener listens on pacod-admin-net alone.
+      PID_INTERNAL_LISTEN: pacod-id-internal:8071
     healthcheck:
       test: ["CMD", "/usr/local/bin/healthcheck", "http://127.0.0.1:9170/readyz"]
       interval: 10s

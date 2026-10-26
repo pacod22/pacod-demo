@@ -20,8 +20,9 @@ RESET := pacod-demo-reset:dev
 # The compose project: the five repositories' own compose files plus the shared layer.
 COMPOSE = COMPOSE_PROFILES=$$(cat .state/profiles 2>/dev/null || echo ui) docker compose \
 	--project-directory . -f compose.yml
-# The tools image on pacod-net, with the demo's state and the repositories it reuses.
-TOOLS_RUN = docker run --rm --network pacod-net --user $$(id -u):$$(id -g) \
+# The tools image on pacod-net, and on pacod-admin-net for the gateway's management API, with
+# the demo's state and the repositories it reuses.
+TOOLS_RUN = docker run --rm --network pacod-net --network pacod-admin-net --user $$(id -u):$$(id -g) \
 	-v "$(CURDIR):/work" -v "$(CURDIR)/.state:/state" \
 	-v "$(CURDIR)/../pacod-ap:/src/pacod-ap:ro" -v "$(CURDIR)/../pacod-cms:/src/pacod-cms:ro" \
 	--env-file .state/env/stack.env $(TOOLS)
@@ -81,8 +82,13 @@ demo.env:
 preflight: demo.env
 	@set -a; . ./demo.env; [ ! -f demo.local.env ] || . ./demo.local.env; set +a; sh scripts/preflight.sh
 
+# pacod-admin-net carries the listeners only servers reach (the gateway's management API,
+# pacod-id's internal one) and must be internal; compose never checks that, so this does.
 network:
 	@docker network inspect pacod-net >/dev/null 2>&1 || docker network create pacod-net >/dev/null
+	@docker network inspect pacod-admin-net >/dev/null 2>&1 || docker network create --internal pacod-admin-net >/dev/null
+	@test "$$(docker network inspect -f '{{.Internal}}' pacod-admin-net)" = true || \
+		{ echo "pacod-admin-net is not internal: remove it (docker network rm pacod-admin-net) and run make network" >&2; exit 1; }
 
 tools:
 	@docker image inspect $(TOOLS) >/dev/null 2>&1 || docker build -q -t $(TOOLS) tools/ >/dev/null
@@ -242,8 +248,9 @@ clean:
 		if [ -n "$$vols" ]; then docker volume rm $$vols >/dev/null; fi
 	@if [ "$(IMAGES)" = 1 ]; then docker image rm $(TOOLS) $(SHOTS) $(RESET) >/dev/null 2>&1 || true; fi
 	@rm -rf .state
-	@if [ -z "$$(docker ps -aq --filter network=pacod-net)" ]; then \
-		docker network rm pacod-net >/dev/null 2>&1 || true; fi
+	@for net in pacod-admin-net pacod-net; do \
+		if [ -z "$$(docker ps -aq --filter network=$$net)" ]; then \
+			docker network rm $$net >/dev/null 2>&1 || true; fi; done
 	@echo "clean: done"
 
 remove: clean

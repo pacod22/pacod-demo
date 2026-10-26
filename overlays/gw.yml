@@ -33,6 +33,9 @@ services:
   pacod-gw:
     ports: !reset []
     environment:
+      # As in production: the development file keeps 0.0.0.0 for its port 18081, which the demo
+      # does not publish, so the management API listens on pacod-admin-net alone.
+      PGW_ADMIN_LISTEN: pacod-gw-admin:8081
       DATABASE_URL: postgres://pacod_gw:${GW_DB_PASSWORD}@pacod-postgres:5432/pacod_gw
       PGW_VALKEY_PASSWORD: ${PGW_VALKEY_PASSWORD}
       PGW_KEK: ${PGW_KEK}

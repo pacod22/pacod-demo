@@ -1,7 +1,8 @@
 #!/bin/sh
 # `make verify`: checks that the full stack runs as one platform. The Docker-level checks run
-# here (one instance of every shared component, one published port); the rest runs on pacod-net
-# in the tools image (scripts/verify.py). Exits 1 when any check fails.
+# here (one instance of every shared component, one published port, the listeners kept on
+# pacod-admin-net); the rest runs on pacod-net and pacod-admin-net in the tools image
+# (scripts/verify.py). Exits 1 when any check fails.
 set -u
 cd "$(dirname "$0")/.."
 fails=0
@@ -32,10 +33,31 @@ stopped=$(docker ps -a --filter label=com.docker.compose.project=pacod-demo --fi
 	--format '{{.Names}}' | grep -v -E '^(gw-preflight|pacod-db-init)$' | tr '\n' ' ')
 if [ -z "$stopped" ]; then report PASS "no service has stopped"; else report FAIL "no service has stopped" "$stopped"; fi
 
+echo "pacod-admin-net (docker)"
+# The listeners only servers reach: on pacod-admin-net, bound to aliases that exist there alone.
+if [ "$(docker network inspect -f '{{.Internal}}' pacod-admin-net 2>/dev/null)" = true ]; then
+	report PASS "pacod-admin-net is internal"
+else
+	report FAIL "pacod-admin-net is internal" "missing or with a route out"
+fi
+expected=" pacod-id pacod-gw gw-console gw-analytics gw-tester ap-frontend ap-api ap-admin-api cms-studio kb-ui "
+others=
+for c in $(docker network inspect -f '{{range .Containers}}{{.Name}} {{end}}' pacod-admin-net 2>/dev/null); do
+	case "$expected" in *" $c "*) ;; *) others="$others$c " ;; esac
+done
+if [ -z "$others" ]; then report PASS "only the listeners and their callers join it"; else report FAIL "only the listeners and their callers join it" "also: $others"; fi
+probe() { docker run --rm --network "$1" busybox:1.38.0 wget -q -T 3 -O /dev/null "$2" >/dev/null 2>&1; }
+for target in http://pacod-gw:8081/readyz http://pacod-id:8071/oidc/jwks; do
+	if probe pacod-net "$target"; then report FAIL "$target refused on pacod-net" "it answered"; else report PASS "$target refused on pacod-net"; fi
+done
+for target in http://pacod-gw-admin:8081/readyz http://pacod-id-internal:8071/oidc/jwks; do
+	if probe pacod-admin-net "$target"; then report PASS "$target answers on pacod-admin-net"; else report FAIL "$target answers on pacod-admin-net"; fi
+done
+
 unhealthy=$(docker ps --filter label=com.docker.compose.project=pacod-demo --filter health=unhealthy --format '{{.Names}}' | tr '\n' ' ')
 if [ -z "$unhealthy" ]; then report PASS "no container is unhealthy"; else report FAIL "no container is unhealthy" "$unhealthy"; fi
 
-docker run --rm --network pacod-net \
+docker run --rm --network pacod-net --network pacod-admin-net \
 	-v "$PWD/scripts:/work/scripts:ro" -v "$PWD/.state:/state:ro" \
 	-v "$PWD/../pacod-ap:/src/pacod-ap:ro" \
 	--env-file .state/env/stack.env \
