@@ -3,7 +3,8 @@
 # sign-in through the shared pacod-id (PGW_AUTH=oidc), the demo's secrets instead of the
 # development ones, and no published ports (the edge serves the console and the data plane).
 # The response cache's Valkey (gw-valkey) gets the demo's password too: the gateway's preflight,
-# the store and the gateway must agree on it.
+# the store and the gateway must agree on it. The demo starts with the response cache on, while a
+# gateway's own default is off.
 services:
   gw-preflight:
     environment:
@@ -45,6 +46,8 @@ services:
       PGW_CONSOLE_URL: ${GW_CONSOLE_ORIGIN}
       PGW_ID_ISSUER: ${PACOD_ID_ISSUER}
       PGW_ID_CLIENT_SECRET: ${PGW_ID_CLIENT_SECRET}
+      # Installs the response cache on for every workspace, on a new database only.
+      PGW_CACHE_DEFAULT_MODE: enforce
     depends_on:
       pacod-id:
         condition: service_healthy

@@ -268,8 +268,10 @@ def gateway() -> None:
 
 
 def response_cache(key: str | None, model: str) -> None:
-    """The response cache, on by default (pacod-gw's docs/plugin-concept.md, section 15): the same
-    call at temperature 0 twice; the second is answered from gw-valkey, without the provider."""
+    """The response cache (pacod-gw's docs/plugin-concept.md, section 15), off in a gateway by
+    default but on in the demo (overlays/gw.yml): the same call at temperature 0 twice; the second
+    is answered from gw-valkey, without the provider. Switched off in the console, the call reaches
+    the provider and is not kept."""
     if not key:
         return
     auth = {"Authorization": f"Bearer {key}"}
@@ -282,9 +284,14 @@ def response_cache(key: str | None, model: str) -> None:
         status, first, hdrs = http("POST", "http://pacod-gw:8080/v1/chat/completions", headers=auth,
                                    body=body, timeout=60)
         result = hdrs.get("x-gw-cache") if hdrs else None
+        if status == 200 and not result:
+            attempts = hdrs.get("x-gw-attempts") if hdrs else None
+            report(None if attempts != "0" else False,
+                   "response cache: off (the demo starts it on: switched off in the console?)",
+                   f"{status}, no x-gw-cache, {attempts} attempts")
+            return
         if status != 200 or result != "miss":
-            report(False, "response cache: a new call is a miss",
-                   f"{status}, x-gw-cache {result}" + ("" if result else " (the cache is not bound: switched off?)"))
+            report(False, "response cache: a new call is a miss", f"{status}, x-gw-cache {result}")
             return
         # The answer is kept once the call has settled, off the request path.
         for _ in range(10):
