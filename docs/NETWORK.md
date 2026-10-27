@@ -1,7 +1,7 @@
 # The pacod network and naming convention
 
-All pacod repos (`pacod-id`, `pacod-gw`, `pacod-ap`, `pacod-cms`, `pacod-kb`) follow this
-convention, so their compose files can run on their own or be put together into one full stack
+All pacod repos (`pacod-id`, `pacod-gw`, `pacod-ap`, `pacod-cms`, `pacod-kb`, `pacod-benchmark`)
+follow this convention, so their compose files can run on their own or be put together into one full stack
 (`pacod-demo`) without editing them.
 
 ## 1. Two networks: `pacod-net` and `pacod-admin-net`
@@ -10,22 +10,24 @@ convention, so their compose files can run on their own or be put together into 
   There are no project networks, no `agent-net`, `pacod-link`, `pacod-cms-net`, `kb-id`, `kb-ai`,
   `backend`, `edge`, `egress` or `id-edge`.
 - The listeners that only servers reach are on the second external network, `pacod-admin-net`,
-  which is **internal** (no route out). Today these are the gateway's management API and
-  pacod-id's internal listener. The services that call them join it as well; nothing else does.
+  which is **internal** (no route out). Today these are the gateway's management API,
+  pacod-id's internal listener and pacod-benchmark's API. The services that call them join it as well; nothing else does.
 - **A listener on `pacod-admin-net` binds to an alias**, never to `0.0.0.0`. Its service has the
-  alias on `pacod-admin-net` alone (`pacod-gw-admin`, `pacod-id-internal`), and the listen
-  variable names it (`PGW_ADMIN_LISTEN=pacod-gw-admin:8081`,
-  `PID_INTERNAL_LISTEN=pacod-id-internal:8071`). A container that listens on `0.0.0.0` is reachable
+  alias on `pacod-admin-net` alone (`pacod-gw-admin`, `pacod-id-internal`, `bench-api-internal`),
+  and the listen variable names it (`PGW_ADMIN_LISTEN=pacod-gw-admin:8081`,
+  `PID_INTERNAL_LISTEN=pacod-id-internal:8071`, `BENCH_LISTEN=bench-api-internal:8190`). A container that listens on `0.0.0.0` is reachable
   on every network it joins, so the binding, not the network, keeps the rest of `pacod-net` out.
 - **Clients call the alias**, never `pacod-gw:8081` or `pacod-id:8071`. A container on both
   networks may resolve a service name to either of its addresses, and nothing listens there on
   the `pacod-net` one.
 - A development file that publishes such a port to the host keeps `0.0.0.0`: a published port
-  never reaches an internal network. The full stack publishes neither and binds both to their
-  aliases (`overlays/gw.yml`, `overlays/id.yml`). `make verify` checks that `pacod-net` alone
-  reaches neither and that only their callers join `pacod-admin-net`.
+  never reaches an internal network. The full stack publishes none of them and binds each to its
+  alias (`overlays/gw.yml`, `overlays/id.yml`; pacod-benchmark's app file binds its own).
+  `make verify` checks that `pacod-net` alone reaches none of them and that only their callers join `pacod-admin-net`.
 - Exception: the multi-machine and load-test overlays of pacod-gw (`hub`, `node`, `scale`,
-  `load-agent`, `load`) keep the extra networks they need between machines.
+  `load-agent`, `load`) keep the extra networks they need between machines, and pacod-benchmark's
+  API keeps `bench-agents` towards its load agents. In the full stack it joins pacod-gw's
+  `load-out` as well, to reach the gateway's load agent (`overlays/bench.yml`).
 - Compose declares them as
 
   ```yaml
@@ -66,7 +68,7 @@ own clients only.
 - The compose service key, the `container_name` and the DNS name on `pacod-net` are the same.
 - **Shared components** (used by more than one product, or a platform concern) are named
   `pacod-*`. Only one instance of each may run on a host at a time.
-- **Everything else** carries its owner's prefix: `id-`, `gw-`, `ap-`, `cms-`, `kb-`.
+- **Everything else** carries its owner's prefix: `id-`, `gw-`, `ap-`, `cms-`, `kb-`, `bench-`.
 - **Volume keys** follow the same rule (`pacod-postgres-data`, `gw-clickhouse-data`,
   `cms-mongo-data`, `kb-ui-data`, ...).
 - Host ports are unchanged in each repo's standalone mode; the full stack publishes only its edge.
@@ -75,15 +77,15 @@ own clients only.
 
 | Name | What | Ports on `pacod-net` | Standalone copies in |
 |---|---|---|---|
-| `pacod-caddy` | the edge (Caddy 2.11.6) | as configured | gw, ap, cms |
-| `pacod-postgres` | PostgreSQL 18.6 (kb standalone: 16) | 5432 | id, gw, ap, cms, kb |
-| `pacod-db-init` | one-shot: runs every `platform/postgres/*-db.sh` against `pacod-postgres` | - | gw, ap, cms, kb, id |
+| `pacod-caddy` | the edge (Caddy 2.11.6) | as configured | gw, ap, cms, bench |
+| `pacod-postgres` | PostgreSQL 18.6 (kb standalone: 16) | 5432 | id, gw, ap, cms, kb, bench |
+| `pacod-db-init` | one-shot: runs every `platform/postgres/*-db.sh` against `pacod-postgres` | - | gw, ap, cms, kb, id, bench |
 | `pacod-qdrant` | Qdrant v1.19.2 | 6333, 6334 | ap, kb |
 | `pacod-embeddings` | bge-m3 embeddings + reranker (`/embed`, `/rerank`) | 8080 | defined in ap's app file |
-| `pacod-id` | identity provider | 8070 public, 8071 internal (`pacod-id-internal` on `pacod-admin-net`), 9170 metrics | gw, ap, cms, kb (pacod-id: its app file) |
+| `pacod-id` | identity provider | 8070 public, 8071 internal (`pacod-id-internal` on `pacod-admin-net`), 9170 metrics | gw, ap, cms, kb, bench (pacod-id: its app file) |
 | `pacod-gw` | the gateway: full core, or gw-lite in cms/kb standalone | 8080 data plane, 8081 management (`pacod-gw-admin` on `pacod-admin-net`), 9100 metrics | cms, kb (lite) (pacod-gw: its app file) |
 | `gw-mock` | the gateway's mock LLM provider | 9000 | gw (dev), cms, kb |
-| `pacod-mailpit` | mail sink | 1025 SMTP, 8025 web | id, gw, ap, cms, kb |
+| `pacod-mailpit` | mail sink | 1025 SMTP, 8025 web | id, gw, ap, cms, kb, bench |
 | `pacod-prometheus`, `pacod-alertmanager`, `pacod-grafana`, `pacod-otel` | monitoring | 9090, 9093, 3000, 4317/4318 | gw, ap |
 | `pacod-node-exporter`, `pacod-cadvisor`, `pacod-postgres-exporter` | platform exporters | 9100, 8080, 9187 | ap |
 
@@ -104,10 +106,10 @@ The variable names stay what each product already calls them; only their default
 
 | Component | Default address | Variables |
 |---|---|---|
-| pacod-id, internal | `http://pacod-id-internal:8071` (on `pacod-admin-net`) | ap `ID_INTERNAL_URL`, gw `PGW_ID_INTERNAL_URL`, cms and kb `PACOD_ID_INTERNAL_URL` |
+| pacod-id, internal | `http://pacod-id-internal:8071` (on `pacod-admin-net`) | ap `ID_INTERNAL_URL`, gw `PGW_ID_INTERNAL_URL`, cms and kb `PACOD_ID_INTERNAL_URL`, bench `BENCH_ID_INTERNAL_URL` |
 | pacod-gw, data plane | `http://pacod-gw:8080` | ap `GATEWAY_URL`, cms and kb `PACOD_GW_URL` |
-| pacod-gw, management | `http://pacod-gw-admin:8081` (on `pacod-admin-net`) | ap `GATEWAY_ADMIN_URL`, gw `GATEWAY_API_URL`, `PGW_CORE_ADMIN_URL` |
-| PostgreSQL | `pacod-postgres:5432` | ap via `ap-pgbouncer`, kb `KB_DATABASE_HOST`, gw `DATABASE_URL`, id `PID_DATABASE_URL` |
+| pacod-gw, management | `http://pacod-gw-admin:8081` (on `pacod-admin-net`) | ap `GATEWAY_ADMIN_URL`, gw `GATEWAY_API_URL`, `PGW_CORE_ADMIN_URL`, bench `BENCH_GW_ADMIN_URL` |
+| PostgreSQL | `pacod-postgres:5432` | ap via `ap-pgbouncer`, kb `KB_DATABASE_HOST`, gw `DATABASE_URL`, id `PID_DATABASE_URL`, bench `DATABASE_URL` |
 | Qdrant | `http://pacod-qdrant:6333` | ap and kb `QDRANT_URL` |
 | Embeddings | `http://pacod-embeddings:8080` | ap `EMBEDDINGS_URL`; kb `EMBEDDINGS_URL` (unset: in-process model) |
 | Mail | `pacod-mailpit:1025` | `PID_SMTP_HOST`, `SMTP_HOST` |
@@ -135,6 +137,7 @@ The variable names stay what each product already calls them; only their default
 | pacod-ap | `pacod-api/docker-compose.yml` (+ `.local.yml`, `.gpu.yml`) | `pacod-api/docker-compose.standalone.yml` (+ `.standalone.local.yml`); monitoring in `monitoring/` |
 | pacod-cms | `docker-compose.yml` | `docker-compose.standalone.yml` |
 | pacod-kb | `docker-compose.yml` | `docker-compose.standalone.yml` |
+| pacod-benchmark | `docker-compose.yml` (+ `.dev.yml`) | `docker-compose.standalone.yml` |
 
 ## 4. Fragments: each repo's share of the shared configuration
 
@@ -160,6 +163,7 @@ root. Its standalone copies consume them, and so does the full stack: nothing is
 | pacod-ap | `AP_SITE` |
 | pacod-cms | `CMS_STUDIO_SITE`, `CMS_PUBLIC_SITE` (catch-all) |
 | pacod-kb | `KB_SITE` |
+| pacod-benchmark | `BENCH_SITE` |
 
 ### PostgreSQL: `platform/postgres/<product>-db.sh`
 
@@ -178,6 +182,7 @@ root. Its standalone copies consume them, and so does the full stack: nothing is
 | pacod-gw | `pacod_gw` | `GW_DB_PASSWORD` |
 | pacod-ap | `pacod` | `AP_DB_PASSWORD` |
 | pacod-kb | `kb` | `KB_DATABASE_PASSWORD` |
+| pacod-benchmark | `bench` | `BENCH_DB_PASSWORD` |
 
 ### Monitoring: `platform/prometheus/<product>.yml`
 
@@ -195,5 +200,6 @@ root. Its standalone copies consume them, and so does the full stack: nothing is
 | pacod-gw | `pacod-gw-core`, `otel-collector` | `deploy/prometheus/rules/` | `deploy/grafana/dashboards/` |
 | pacod-ap | `api`, `admin-api`, `mcp-server`, `embeddings`, `ingestion`, `frontend`, `pgbouncer`, `redis` | `monitoring/prometheus/alerts/` (its `gw.rules.yml` is a copy of the gateway's) | `monitoring/grafana/dashboards/` |
 | pacod-cms, pacod-kb | none (no metrics endpoints; cAdvisor covers their containers) | - | - |
+| pacod-benchmark | `pacod-bench` | - | - |
 
 - Grafana's Prometheus datasource has the uid `prometheus` everywhere.

@@ -4,7 +4,8 @@
 # development ones, and no published ports (the edge serves the console and the data plane).
 # The response cache's Valkey (gw-valkey) gets the demo's password too: the gateway's preflight,
 # the store and the gateway must agree on it. The demo starts with the response cache on, while a
-# gateway's own default is off.
+# gateway's own default is off. The load tests' agent and mock run too, with the demo's agent
+# token: the console's load tests and pacod-benchmark share them.
 services:
   gw-preflight:
     environment:
@@ -19,6 +20,7 @@ services:
       PGW_UI_CLIENT_SECRET: ${PGW_UI_CLIENT_SECRET}
       PGW_UI_SESSION_SECRET: ${PGW_UI_SESSION_SECRET}
       TESTER_ID_CLIENT_SECRET: ${TESTER_ID_CLIENT_SECRET}
+      TESTER_LOAD_TOKEN: ${TESTER_LOAD_TOKEN}
 
   gw-clickhouse:
     ports: !reset []
@@ -45,7 +47,8 @@ services:
       # With PGW_AUTH=oidc the first admin is pacod-id's bootstrap admin; no local admin.
       PGW_ADMIN_EMAIL: ""
       PGW_ADMIN_PASSWORD: ""
-      PGW_EGRESS_ALLOW_PRIVATE: gw-mock
+      # The development mock, and the load tests' mock (pacod-gw's tester, pacod-benchmark).
+      PGW_EGRESS_ALLOW_PRIVATE: gw-mock,gw-load-mock
       PGW_CONSOLE_URL: ${GW_CONSOLE_ORIGIN}
       PGW_ID_ISSUER: ${PACOD_ID_ISSUER}
       PGW_ID_CLIENT_SECRET: ${PGW_ID_CLIENT_SECRET}
@@ -60,7 +63,7 @@ services:
     environment:
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       PGW_INTERNAL_TOKEN: ${PGW_INTERNAL_TOKEN}
-      PGW_EGRESS_ALLOW_PRIVATE: gw-mock
+      PGW_EGRESS_ALLOW_PRIVATE: gw-mock,gw-load-mock
 
   gw-console:
     environment:
@@ -69,11 +72,26 @@ services:
       PGW_UI_CLIENT_SECRET: ${PGW_UI_CLIENT_SECRET}
       PGW_UI_SESSION_SECRET: ${PGW_UI_SESSION_SECRET}
       PGW_CONSOLE_URL: ${GW_CONSOLE_ORIGIN}
+      # The Benchmarks page links to pacod-benchmark.
+      BENCH_URL: ${BENCH_ORIGIN}
 
   gw-tester:
     ports: !reset []
     environment:
       TESTER_ID_CLIENT_SECRET: ${TESTER_ID_CLIENT_SECRET}
+      # The stack's one agent; the development file also names one on another machine.
+      TESTER_LOAD_AGENTS: local=http://gw-load-agent:8096
+      TESTER_LOAD_TOKEN: ${TESTER_LOAD_TOKEN}
 
   gw-mock:
+    ports: !reset []
+
+  # The load tests' agent and mock (pacod-gw's docker-compose.load*.yml), with the demo's agent
+  # token instead of the development one; pacod-benchmark drives the same agent (overlays/bench.yml).
+  gw-load-agent:
+    ports: !reset []
+    environment:
+      LOAD_AGENT_TOKEN: ${TESTER_LOAD_TOKEN}
+
+  gw-load-mock:
     ports: !reset []

@@ -225,6 +225,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 
 	/* The foundation: two smaller cards side by side. */
 	.duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+	.duo + .product { margin-top: 28px; }
 	.product.compact { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 24px; margin-bottom: 0; }
 
 	/* Screenshots: a browser frame with the address; a second one overlaps the first's corner. */
@@ -429,6 +430,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 		<span class="label">Also in the stack</span>
 		<a class="id" href="#pacod-id"><span class="badge">ID</span>pacod-id</a>
 		<a href="#pacod-kb"><span class="badge">KB</span>pacod-kb</a>
+		<a href="#pacod-benchmark"><span class="badge">BM</span>pacod-benchmark</a>
 	</div>
 
 	<section class="section" id="products">
@@ -561,7 +563,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 	<section class="section" id="foundation">
 		<div class="wrap">
 			<h2>Also in the stack</h2>
-			<p class="sub">pacod-id signs everyone in to every product. pacod-kb, a RAG knowledge base, runs beside them.</p>
+			<p class="sub">pacod-id signs everyone in to every product. pacod-kb, a RAG knowledge base, and pacod-benchmark, the gateway's benchmarks, run beside them.</p>
 			<div class="duo">
 				<!-- pacod-id -->
 				<article class="product id compact" id="pacod-id">
@@ -610,6 +612,30 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 					</div>
 				</article>
 			</div>
+
+			<!-- pacod-benchmark -->
+			<article class="product" id="pacod-benchmark">
+				<div>
+					<div class="head"><span class="badge">BM</span><h3>pacod-benchmark</h3></div>
+					<div class="role">Gateway benchmarks</div>
+					<p>Measures pacod-gw in managed and proxy mode, pacod-gw-lite and other gateways, over a matrix of settings: response cache, audit, streaming, translation and load. Every run gets an organisation of its own, removed afterwards, and a direct call to the mock as its baseline, so the gateway's own overhead shows. Reports are published to the gateway console.</p>
+					<p>Here its load agent runs on the same machine as the gateway: the figures show how the gateway behaves, not its capacity.</p>
+					<ul class="stack"><li>Rust</li><li>axum</li><li>PostgreSQL</li><li>SvelteKit</li><li>Chart.js</li></ul>
+					<div class="links">
+						<div class="btns">
+							<a class="btn primary" href="{{$s}}://bench.{{$d}}{{$p}}/">Benchmarks</a>
+							<a class="btn" href="{{$s}}://bench.{{$d}}{{$p}}/suites">Suites</a>
+							<a class="btn" href="{{$s}}://console.{{$d}}{{$p}}/platform/testing/benchmarks">Reports in the console</a>
+						</div>
+					</div>
+				</div>
+				<div class="shots">
+					<a class="frame" href="{{$s}}://bench.{{$d}}{{$p}}/">
+						<div class="bar"><i></i><i></i><i></i><span>bench.{{$d}}{{$p}}</span></div>
+						<img src="screenshots/bench.png" width="1280" height="800" loading="lazy" alt="pacod-benchmark's dashboard: the latest runs and the load agents">
+					</a>
+				</div>
+			</article>
 		</div>
 	</section>
 

@@ -1,8 +1,8 @@
 # pacod-demo
 
 The whole pacod stack on one machine: identity (pacod-id), the AI gateway (pacod-gw), the agent
-platform (pacod-ap), the CMS (pacod-cms) and the knowledge base (pacod-kb), working together as
-one platform. One configuration file, one `make`.
+platform (pacod-ap), the CMS (pacod-cms), the knowledge base (pacod-kb) and the gateway's
+benchmarks (pacod-benchmark), working together as one platform. One configuration file, one `make`.
 
 ```sh
 make up        # build, start, bootstrap; prints the addresses and the admin's password
@@ -21,20 +21,21 @@ administration and its websites.
 
 - Docker with Compose 2.24 or newer, and make. Everything else (secret generation, the
   bootstrap, the checks) runs in containers.
-- The five repositories checked out next to this one, on the branch with the shared-network
+- The six repositories checked out next to this one, on the branch with the shared-network
   layout (`pacod-net`):
 
   ```
   pacod/
     pacod-demo/   (this)
-    pacod-id/  pacod-gw/  pacod-ap/  pacod-cms/  pacod-kb/
+    pacod-id/  pacod-gw/  pacod-ap/  pacod-cms/  pacod-kb/  pacod-benchmark/
   ```
 
 - Memory: 8 GB for Docker (Docker Desktop's default setting); the whole stack with the real
-  embedding model uses about 5 GiB (measured). Below that, the default `EMBEDDINGS_BACKEND=auto`
+  embedding model uses about 5 GiB (measured before pacod-benchmark joined: it and the gateway's
+  load agent and load mock add under 100 MiB at rest). Below that, the default `EMBEDDINGS_BACKEND=auto`
   picks a light stand-in (about 4 GiB). Disk: about 30 GiB for the
-  images. The first `make up` builds every image from source (two Rust workspaces, a Maven
-  build, several Python images, two SvelteKit apps): 30 to 60 minutes. Later starts take about
+  images. The first `make up` builds every image from source (three Rust workspaces, a Maven
+  build, several Python images, three SvelteKit apps): 30 to 60 minutes. Later starts take about
   two minutes.
 
 ## The addresses
@@ -50,6 +51,7 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 | https://studio.demo.pacod.io | the CMS studio (pacod-cms; `DEMO_STUDIO_SUBDOMAIN`) |
 | https://cms.pacod-sites.net | a CMS demo website, "Demo Journal" (also "Demo Notes" at minimal.pacod-sites.net and "Starward", the space travels, at space.pacod-sites.net): the websites have a domain of their own, `DEMO_SITE_DOMAIN` (below), or with `DEMO_SITE_DOMAIN_SHARED=true` the demo's, cms.demo.pacod.io; the subdomains are `DEMO_CMS_SUBDOMAIN`, `DEMO_CMS_MINIMAL_SUBDOMAIN` and `DEMO_CMS_SPACE_SUBDOMAIN` |
 | https://kb.demo.pacod.io | the knowledge base (pacod-kb) |
+| https://bench.demo.pacod.io | benchmarks of the gateway (pacod-benchmark): suites, runs, comparisons; published reports show in the gateway console |
 | https://id.demo.pacod.io/admin | identity administration (pacod-id) |
 | https://grafana.demo.pacod.io | dashboards of every product |
 | https://mail.demo.pacod.io | every mail the stack sends (invitations, confirmations) |
@@ -165,6 +167,11 @@ the visitor's own zone and how long until the next reset; `make urls` says it to
   the edge's own data, nor the gateway's response cache, which is kept in memory only: every reset
   empties it. It is kept, compressed, in the Docker volume `pacod-demo-baseline`;
   `make clean` deletes it with the rest.
+- **Benchmarks** go back too: pacod-benchmark's runs, and the reports published to the gateway
+  console. To keep a report, download it (its run's page, *Download the report*); the console
+  takes it back by upload (*Platform → Testing → Benchmarks*). A baseline from before
+  pacod-benchmark joined the stack has no token for it: every reset makes a new one, until
+  `make baseline` keeps one.
 - **`make reset`** does the same as the nightly reset, now. Both stop every service but the edge
   (the home page stays up), put the baseline back, start the stack and run the bootstrap again,
   which applies what `demo.local.env` has gained since the baseline (a provider key). The admin's
@@ -216,7 +223,7 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
 
 ## Updating
 
-After pulling this repository and the five products:
+After pulling this repository and the six products:
 
 ```sh
 make build      # make up builds only missing images: without this the old ones keep running
@@ -230,15 +237,16 @@ migrate again at each start.
 
 ## How it is put together
 
-- **Two networks, unique names.** All five repositories follow one convention
+- **Two networks, unique names.** All six repositories follow one convention
   ([docs/NETWORK.md](docs/NETWORK.md)): every container joins the external network `pacod-net`
   under a name unique across the repositories. Shared components are `pacod-*`; everything else
-  carries its owner's prefix (`gw-`, `ap-`, `cms-`, `kb-`). The gateway's management API and
-  pacod-id's internal listener are on the internal network `pacod-admin-net` alone, as
-  `pacod-gw-admin:8081` and `pacod-id-internal:8071`, and only their callers join it.
+  carries its owner's prefix (`gw-`, `ap-`, `cms-`, `kb-`, `bench-`). The gateway's management
+  API, pacod-id's internal listener and the benchmark's API are on the internal network
+  `pacod-admin-net` alone, as `pacod-gw-admin:8081`, `pacod-id-internal:8071` and
+  `bench-api-internal:8190`, and only their callers join it.
 - **The repositories' own compose files.** Each repository splits its compose setup into an
   app file (its own services) and a standalone file (its own copies of the shared components,
-  for running it alone). [compose.yml](compose.yml) includes the five app files unchanged; a
+  for running it alone). [compose.yml](compose.yml) includes the six app files unchanged; a
   small overlay per repository ([overlays/](overlays/)) only removes published ports, points
   settings at the demo's files and sets the public addresses.
 - **One of each shared component** ([platform.yml](platform.yml)): one Caddy, one PostgreSQL
@@ -255,7 +263,9 @@ migrate again at each start.
   the credentials the bootstrap makes (gateway keys, service tokens), and each product's
   variables rendered from `demo.env` ([scripts/render-env.sh](scripts/render-env.sh)).
 - **The bootstrap** ([scripts/bootstrap.py](scripts/bootstrap.py)) drives the products' own
-  scripts: pacod-ap's gateway and identity bootstrap and pacod-cms's provisioner.
+  scripts: pacod-ap's gateway and identity bootstrap and pacod-cms's provisioner. It also makes
+  pacod-benchmark's token for the gateway's management API (a platform admin: the benchmark sets
+  up and removes an organisation of its own for every run).
 
 ## Troubleshooting
 

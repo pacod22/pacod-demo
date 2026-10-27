@@ -40,12 +40,14 @@ services:
       GW_DB_PASSWORD: ${GW_DB_PASSWORD}
       AP_DB_PASSWORD: ${AP_DB_PASSWORD}
       KB_DATABASE_PASSWORD: ${KB_DATABASE_PASSWORD}
+      BENCH_DB_PASSWORD: ${BENCH_DB_PASSWORD}
     volumes: !override
       - ../pacod-id/platform/postgres:/initdb.d/id:ro
       - ../pacod-gw/platform/postgres:/initdb.d/gw:ro
       # ap's directory also holds its copy of pacod-id's script, for ap's own stack: take its own.
       - ../pacod-ap/platform/postgres/ap-db.sh:/initdb.d/ap/ap-db.sh:ro
       - ../pacod-kb/platform/postgres:/initdb.d/kb:ro
+      - ../pacod-benchmark/platform/postgres:/initdb.d/bench:ro
 
   # ---- Vectors: one Qdrant; the app's collections are pacod_*, the knowledge base's kb_* --------
   pacod-qdrant:
@@ -106,6 +108,7 @@ services:
       CMS_MINIMAL_HOST: ${CMS_MINIMAL_HOST}
       CMS_SPACE_HOST: ${CMS_SPACE_HOST}
       KB_SITE: ${KB_SITE}
+      BENCH_SITE: ${BENCH_SITE}
       # The home page's notice of the nightly reset (the Makefile's scheduler).
       DEMO_RESET: ${DEMO_RESET}
       DEMO_RESET_TIME: ${DEMO_RESET_TIME}
@@ -121,6 +124,7 @@ services:
       PGW_CADDY_LOG_FORMAT: ${PGW_CADDY_LOG_FORMAT}
       CMS_CADDY_LOG_FORMAT: ${CMS_CADDY_LOG_FORMAT}
       KB_CADDY_LOG_FORMAT: ${KB_CADDY_LOG_FORMAT}
+      BENCH_CADDY_LOG_FORMAT: ${BENCH_CADDY_LOG_FORMAT}
     volumes: !override
       - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
       - ../pacod-id/platform/caddy/id.caddy:/etc/caddy/sites/id.caddy:ro
@@ -128,6 +132,7 @@ services:
       - ../pacod-ap/platform/caddy/ap.caddy:/etc/caddy/sites/ap.caddy:ro
       - ../pacod-cms/platform/caddy/cms.caddy:/etc/caddy/sites/cms.caddy:ro
       - ../pacod-kb/platform/caddy/kb.caddy:/etc/caddy/sites/kb.caddy:ro
+      - ../pacod-benchmark/platform/caddy/bench.caddy:/etc/caddy/sites/bench.caddy:ro
       - ./home:/srv/home:ro
       # The certificate and key that demo.env names (DEMO_TLS_CERT, DEMO_TLS_KEY).
       - ./certs:/etc/caddy/tls:ro
@@ -148,6 +153,7 @@ services:
           - ${CMS_MINIMAL_HOST}
           - ${CMS_SPACE_HOST}
           - kb.${DEMO_DOMAIN}
+          - bench.${DEMO_DOMAIN}
           - grafana.${DEMO_DOMAIN}
           - mail.${DEMO_DOMAIN}
           - prometheus.${DEMO_DOMAIN}
@@ -177,6 +183,7 @@ services:
       - ../pacod-id/platform/prometheus/id.yml:/etc/prometheus/scrape.d/id.yml:ro
       - ../pacod-gw/platform/prometheus/gw.yml:/etc/prometheus/scrape.d/gw.yml:ro
       - ../pacod-ap/platform/prometheus/ap.yml:/etc/prometheus/scrape.d/ap.yml:ro
+      - ../pacod-benchmark/platform/prometheus/bench.yml:/etc/prometheus/scrape.d/bench.yml:ro
       - pacod-prometheus-data:/prometheus
 
   pacod-alertmanager:

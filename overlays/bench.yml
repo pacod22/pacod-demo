@@ -1,0 +1,51 @@
+# Adapts pacod-benchmark's app file (../pacod-benchmark/docker-compose.yml) to the full stack:
+# sign-in through the shared pacod-id, the demo's secrets, no published ports (the edge serves
+# the UI), and the gateway of this stack as the one it manages.
+#
+# It drives the gateway's own load agent (gw-load-agent, pacod-gw's docker-compose.load.yml), in
+# the stack: its figures show behaviour, not capacity. The agent is on the gateway's project
+# network load-out, which bench-api joins to reach it. Its baselines call the load mock straight
+# (gw-load-mock, on the agent's network load-gw).
+#
+# BENCH_GW_ADMIN_URL comes with BENCH_GW_ADMIN_TOKEN: the bootstrap mints the token (a
+# platform-admin token of the gateway, scripts/bootstrap.py), and scripts/render-env.sh names the
+# gateway only once the token is there. Until then the benchmark manages no gateway; make up
+# recreates bench-api after the bootstrap.
+services:
+  bench-api:
+    ports: !reset []
+    environment:
+      DATABASE_URL: postgres://bench:${BENCH_DB_PASSWORD}@pacod-postgres:5432/bench
+      RUST_LOG: ${DEMO_LOG_LEVEL},sqlx=warn
+      BENCH_LOG_FORMAT: ${DEMO_LOG_FORMAT}
+      BENCH_ID_ISSUER: ${PACOD_ID_ISSUER}
+      BENCH_ID_SERVICE_SECRET: ${BENCH_ID_SERVICE_SECRET}
+      BENCH_GW_NAME: demo-gateway
+      BENCH_GW_ADMIN_URL: ${BENCH_GW_ADMIN_URL:-}
+      BENCH_GW_ADMIN_TOKEN: ${BENCH_GW_ADMIN_TOKEN:-}
+      BENCH_LOAD_MOCK_URL: http://gw-load-mock:9000
+      BENCH_GW_DECLARED: '{"layout": "single", "notes": "pacod-demo: every product on one machine"}'
+      BENCH_GW_CONSOLE_URL: ${GW_CONSOLE_ORIGIN}
+      BENCH_AGENTS: local=http://gw-load-agent:8096
+      BENCH_AGENT_TOKEN: ${TESTER_LOAD_TOKEN}
+      BENCH_AGENT_PLACEMENT: local=in_stack
+      BENCH_BASELINE_MOCK_URL: http://gw-load-mock:9000
+    networks:
+      load-out:
+    depends_on:
+      pacod-id:
+        condition: service_healthy
+      gw-load-agent:
+        condition: service_healthy
+        required: false
+
+  bench-ui:
+    environment:
+      BENCH_ID_ISSUER: ${PACOD_ID_ISSUER}
+      BENCH_UI_CLIENT_SECRET: ${BENCH_ID_UI_SECRET}
+      BENCH_UI_SESSION_SECRET: ${BENCH_UI_SESSION_SECRET}
+      BENCH_ORIGIN: ${BENCH_ORIGIN}
+
+networks:
+  # pacod-gw's docker-compose.load.yml: the agent's route towards its callers.
+  load-out:

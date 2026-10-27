@@ -1,10 +1,12 @@
 # pacod-id for the full stack: one realm, `pacod`, for every product. One sign-in covers the app
-# (pacod-ap), the gateway console (pacod-gw), the CMS studio (pacod-cms) and the knowledge base
-# (pacod-kb). The clients are the products' own, as their standalone configurations define them:
+# (pacod-ap), the gateway console (pacod-gw), the CMS studio (pacod-cms), the knowledge base
+# (pacod-kb) and the benchmarks (pacod-benchmark). The clients are the products' own, as their
+# standalone configurations define them:
 #
 #   pacod-ap   pacod-api/docker/pacod-id/pacod-id.toml   pacod-web, pacod-api, the gateway's three
 #   pacod-cms  docker/pacod-id/pacod-id.toml             pacod-cms-studio, pacod-cms-service
 #   pacod-kb   docker/pacod-id/pacod-id.toml             pacod-kb-ui, pacod-kb-service
+#   pacod-benchmark  docker/pacod-id/pacod-id.toml       pacod-bench-ui, pacod-bench-service
 #
 # ${NAME} is filled in from pacod-id's environment (.state/env/id.env, made by
 # scripts/render-env.sh from demo.env); secrets come from the variable each `secret_env` names.
@@ -23,7 +25,7 @@ terms_url = "${AP_ORIGIN}/terms"
 terms_version = "2026-10-16"
 privacy_url = "${AP_ORIGIN}/privacy"
 # Who creates, disables and resets accounts besides id.admin.
-accounts_managed_by = ["pacod.admin", "pacod.superuser", "gw.platform_admin", "cms.platform_admin", "kb.admin"]
+accounts_managed_by = ["pacod.admin", "pacod.superuser", "gw.platform_admin", "cms.platform_admin", "kb.admin", "bench.admin"]
 
 # ---- pacod-ap -------------------------------------------------------------------------------
 
@@ -131,3 +133,26 @@ kind = "service"
 product = "kb"
 secret_env = "KB_ID_SERVICE_SECRET"
 audience = "pacod-kb"
+
+# ---- pacod-benchmark --------------------------------------------------------------------------
+
+# The UI's sign-in.
+[[client]]
+id = "pacod-bench-ui"
+realm = "pacod"
+kind = "confidential"
+secret_env = "BENCH_ID_UI_SECRET"
+redirect_uris = ["${BENCH_ORIGIN}/auth/callback"]
+post_logout_redirect_uris = ["${BENCH_ORIGIN}/"]
+initiate_login_uri = "${BENCH_ORIGIN}/auth/login"
+audience = "pacod-bench"
+
+# The API as a service: the benchmark's manifest and the feed. On the gateway it acts with the
+# gateway's own admin token (scripts/bootstrap.py), not a token of pacod-id's.
+[[client]]
+id = "pacod-bench-service"
+realm = "pacod"
+kind = "service"
+product = "bench"
+secret_env = "BENCH_ID_SERVICE_SECRET"
+audience = "pacod-bench"

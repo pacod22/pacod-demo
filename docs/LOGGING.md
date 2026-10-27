@@ -1,7 +1,7 @@
 # The pacod logging convention
 
-All pacod repos (`pacod-id`, `pacod-gw`, `pacod-ap`, `pacod-cms`, `pacod-kb`) log the same way, so
-one reader (a terminal, `docker compose logs`, or a log collector such as Loki or Elastic) handles
+All pacod repos (`pacod-id`, `pacod-gw`, `pacod-ap`, `pacod-cms`, `pacod-kb`, `pacod-benchmark`)
+log the same way, so one reader (a terminal, `docker compose logs`, or a log collector such as Loki or Elastic) handles
 every product without a parser per product. The full stack (`pacod-demo`) sets the level and
 format of all of them with two values (section 7).
 
@@ -57,6 +57,7 @@ everywhere:
 | pacod-ap | ap-frontend | `LOG_LEVEL` | `LOG_FORMAT` | json (text while `NODE_ENV` is not `production` and the format is unset) |
 | pacod-cms | cms-site, cms-studio | `APP_LOG_LEVEL` | `APP_LOG_FORMAT` | json |
 | pacod-kb | kb-pipeline, kb-ui | `LOG_LEVEL` | `LOG_FORMAT` | json |
+| pacod-benchmark | bench-api | `RUST_LOG` | `BENCH_LOG_FORMAT` | json |
 
 A repo's development compose files may set `text` for the developer's terminal; its production
 files keep `json`. Every compose file passes the variables through with today's value as the

@@ -99,6 +99,7 @@ def edge() -> None:
     check("cms studio", E["CMS_STUDIO_ORIGIN"] + "/mgmt/login", want=(200, 302))
     check("cms demo website", E["CMS_DEMO_ORIGIN"] + "/", want=(200,))
     check("knowledge base", E["KB_ORIGIN"] + "/kb/healthz", contains='"identity"')
+    check("benchmark", E["BENCH_ORIGIN"] + "/", want=(302, 303))
     if not PUBLIC:
         check("grafana", E["GRAFANA_ORIGIN"] + "/api/health")
     if PUBLIC:
@@ -138,6 +139,8 @@ def health() -> None:
         ("cms-site", "http://cms-site:8443/web/v1/health"),
         ("cms-studio", "http://cms-studio:7443/mgmt-health"),
         ("kb-pipeline", "http://kb-pipeline:8000/health"),
+        # Ready only with a current copy of its roles from pacod-id.
+        ("bench-api ready (pacod-admin-net)", "http://bench-api-internal:8190/api/v1/readyz"),
         ("pacod-qdrant", "http://pacod-qdrant:6333/readyz"),
         ("pacod-prometheus", "http://pacod-prometheus:9090/-/ready"),
         ("pacod-alertmanager", "http://pacod-alertmanager:9093/-/ready"),
@@ -210,6 +213,7 @@ def sso() -> None:
         ("cms studio (pacod-cms)", E["CMS_STUDIO_ORIGIN"], "/mgmt/oauth2/authorization/pacod-id",
          "/mgmt/oauth2/code/pacod-id"),
         ("knowledge base (pacod-kb)", E["KB_ORIGIN"], "/kb/login", "/kb/auth/callback"),
+        ("benchmark (pacod-benchmark)", E["BENCH_ORIGIN"], "/auth/login", "/auth/callback"),
     ]
     for name, origin, login, callback in products:
         jar = Jar()

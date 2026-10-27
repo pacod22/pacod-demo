@@ -1,4 +1,4 @@
-# The pacod full stack on one machine: one compose project made of the five repositories' own
+# The pacod full stack on one machine: one compose project made of the six repositories' own
 # compose files (their "app files"), a small overlay per repository, and the shared layer
 # (platform.yml). Run it with `make up`, not by hand: the Makefile generates the secrets and the
 # env files under .state/ that every include below reads.
@@ -15,10 +15,14 @@ include:
       - overlays/id.yml
     env_file: [.state/env/stack.env, .state/env/id.env]
 
-  # pacod-gw: the gateway (core, analytics, console, tester, ClickHouse) and its mock provider.
+  # pacod-gw: the gateway (core, analytics, console, tester, ClickHouse), its mock provider, and
+  # the load agent and load mock of its load tests (docker-compose.load*.yml), which
+  # pacod-benchmark drives too.
   - path:
       - ../pacod-gw/deploy/docker-compose.yml
       - ../pacod-gw/deploy/docker-compose.dev.yml
+      - ../pacod-gw/deploy/docker-compose.load.yml
+      - ../pacod-gw/deploy/docker-compose.load.dev.yml
       - overlays/gw.yml
     env_file: [.state/env/stack.env, .state/env/gw.env]
 
@@ -46,6 +50,12 @@ include:
       - ../pacod-kb/docker-compose.yml
       - overlays/kb.yml
     env_file: [.state/env/stack.env, .state/env/kb.env]
+
+  # pacod-benchmark: benchmarks of the gateway (API, UI), on the gateway's load agent and mock.
+  - path:
+      - ../pacod-benchmark/docker-compose.yml
+      - overlays/bench.yml
+    env_file: [.state/env/stack.env, .state/env/bench.env]
 
   # The shared layer: one PostgreSQL, Qdrant, mail sink, edge and monitoring stack.
   - path: platform.yml

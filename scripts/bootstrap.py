@@ -10,7 +10,9 @@ products already ship, pointed at the demo's files instead of a checkout's.
    bootstrap admin's sign-in, the platform configuration (mock providers, or the real ones when
    demo.env has a provider key), provider credentials, one gateway key per calling service
    (the app's four plus pacod-cms and pacod-kb), and the app's report and admin tokens.
-2. The CMS studio's provisioner account and token (pacod-cms's scripts/id-provisioner.mjs).
+2. pacod-benchmark's admin token (BENCH_GW_ADMIN_TOKEN): a platform admin of the gateway, as the
+   benchmark sets up and removes its own organisation, workspaces and keys for every run.
+3. The CMS studio's provisioner account and token (pacod-cms's scripts/id-provisioner.mjs).
 
 Every step keeps what still works, so a second run changes nothing. All results go to
 /state/bootstrap.env; nothing secret is printed. scripts/render-env.sh then hands them to the
@@ -58,7 +60,7 @@ def say(msg: str) -> None:
     print(f"bootstrap: {msg}", flush=True)
 
 
-def gateway() -> None:
+def gateway() -> gw.Api:
     providers = gw.read_env(gw.PROVIDERS_ENV)
     live = any(providers.get(v) for v in gw.PROVIDER_KEYS.values())
     env = "live" if live else "dev"
@@ -70,6 +72,7 @@ def gateway() -> None:
     gw.ensure_credentials(api, rotate=False)
     gw.ensure_keys(api, DATA_URL)
     gw.ensure_admin_api_tokens(api)
+    return api
 
 
 def cms_provisioner() -> None:
@@ -97,9 +100,24 @@ def cms_provisioner() -> None:
     say("cms: the studio's provisioner is in place")
 
 
+def bench(api: gw.Api) -> None:
+    # A platform admin, as only one may read the system's status: a token that answers it is kept.
+    token = gw.read_env(OUT).get("BENCH_GW_ADMIN_TOKEN")
+    if token:
+        status = gw.probe("GET", f"{api.base}/system/status", token)
+        if not gw.refused(status):
+            say("bench: BENCH_GW_ADMIN_TOKEN works")
+            return
+        say(f"bench: BENCH_GW_ADMIN_TOKEN is refused ({status}); making a new one")
+    token = gw.make_admin_token(api, "pacod-bench", "platform_admin", {"type": "platform"})
+    gw.write_env(OUT, {"BENCH_GW_ADMIN_TOKEN": token})
+    say("bench: made BENCH_GW_ADMIN_TOKEN (platform admin)")
+
+
 def main() -> None:
     OUT.touch(mode=0o600, exist_ok=True)
-    gateway()
+    api = gateway()
+    bench(api)
     cms_provisioner()
     say(f"done; credentials in .state/{OUT.name}")
 

@@ -40,17 +40,17 @@ if [ "$(docker network inspect -f '{{.Internal}}' pacod-admin-net 2>/dev/null)" 
 else
 	report FAIL "pacod-admin-net is internal" "missing or with a route out"
 fi
-expected=" pacod-id pacod-gw gw-console gw-analytics gw-tester ap-frontend ap-api ap-admin-api cms-studio kb-ui "
+expected=" pacod-id pacod-gw gw-console gw-analytics gw-tester ap-frontend ap-api ap-admin-api cms-studio kb-ui bench-api bench-ui "
 others=
 for c in $(docker network inspect -f '{{range .Containers}}{{.Name}} {{end}}' pacod-admin-net 2>/dev/null); do
 	case "$expected" in *" $c "*) ;; *) others="$others$c " ;; esac
 done
 if [ -z "$others" ]; then report PASS "only the listeners and their callers join it"; else report FAIL "only the listeners and their callers join it" "also: $others"; fi
 probe() { docker run --rm --network "$1" busybox:1.38.0 wget -q -T 3 -O /dev/null "$2" >/dev/null 2>&1; }
-for target in http://pacod-gw:8081/readyz http://pacod-id:8071/oidc/jwks; do
+for target in http://pacod-gw:8081/readyz http://pacod-id:8071/oidc/jwks http://bench-api:8190/api/v1/healthz; do
 	if probe pacod-net "$target"; then report FAIL "$target refused on pacod-net" "it answered"; else report PASS "$target refused on pacod-net"; fi
 done
-for target in http://pacod-gw-admin:8081/readyz http://pacod-id-internal:8071/oidc/jwks; do
+for target in http://pacod-gw-admin:8081/readyz http://pacod-id-internal:8071/oidc/jwks http://bench-api-internal:8190/api/v1/healthz; do
 	if probe pacod-admin-net "$target"; then report PASS "$target answers on pacod-admin-net"; else report FAIL "$target answers on pacod-admin-net"; fi
 done
 

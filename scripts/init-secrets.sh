@@ -35,6 +35,7 @@ need PID_DB_PASSWORD hex 16
 need GW_DB_PASSWORD hex 16
 need AP_DB_PASSWORD hex 16
 need KB_DATABASE_PASSWORD hex 16
+need BENCH_DB_PASSWORD hex 16
 
 # pacod-id: the key-encryption key and the token pepper.
 need PID_KEK b64 32
@@ -50,7 +51,10 @@ need CMS_ID_STUDIO_SECRET hex 32
 need CMS_ID_SERVICE_SECRET hex 32
 need KB_ID_UI_SECRET hex 32
 need KB_ID_SERVICE_SECRET hex 32
+need BENCH_ID_UI_SECRET hex 32
+need BENCH_ID_SERVICE_SECRET hex 32
 need PGW_UI_SESSION_SECRET hex 32
+need BENCH_UI_SESSION_SECRET hex 32
 
 # pacod-gw.
 need PGW_KEK b64 32
@@ -59,6 +63,8 @@ need PGW_INTERNAL_TOKEN hex 24
 need CLICKHOUSE_PASSWORD hex 16
 # Valkey, the response cache's store (gw-valkey).
 need PGW_VALKEY_PASSWORD hex 24
+# The load agent's token, shared by the gateway's tester and pacod-benchmark.
+need TESTER_LOAD_TOKEN hex 32
 need GRAFANA_ADMIN_PASSWORD alnum 24
 
 # pacod-ap.
