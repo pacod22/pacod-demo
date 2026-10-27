@@ -390,8 +390,27 @@ def cms() -> None:
     check("the studio's login page", E["CMS_STUDIO_ORIGIN"] + "/mgmt/login", want=(200, 302))
 
 
+# ---- 8. The benchmark: the gateway it manages -----------------------------------------------------
+def bench() -> None:
+    section("benchmark (pacod-benchmark: the gateway it manages)")
+    token = gw.read_env(Path("/state/bootstrap.env")).get("BENCH_GW_ADMIN_TOKEN")
+    if not token:
+        report(False, "its token for the gateway", "BENCH_GW_ADMIN_TOKEN is not in .state/bootstrap.env (make bootstrap)")
+        return
+    auth = {"Authorization": f"Bearer {token}"}
+    # Only a platform admin may read the system's status, and the benchmark needs one.
+    status, _, _ = http("GET", "http://pacod-gw-admin:8081/api/v1/system/status", headers=auth)
+    report(status == 200, "its token is a platform admin of the gateway", str(status))
+    status, body, _ = http("GET", "http://pacod-gw-admin:8081/api/v1/benchmark-reports", headers=auth)
+    kept = len(body.get("items", [])) if isinstance(body, dict) else 0
+    report(status == 200, "the gateway takes its reports", f"{status}, {kept} kept")
+    # render-env.sh names the gateway once the token exists; make up then recreates bench-api.
+    named = gw.read_env(Path("/state/env/bench.env")).get("BENCH_GW_ADMIN_URL")
+    report(bool(named), "bench-api is given the gateway to manage", named or "BENCH_GW_ADMIN_URL is empty")
+
+
 def main() -> None:
-    only = sys.argv[1:] or ["edge", "health", "sso", "gateway", "app", "kb", "cms"]
+    only = sys.argv[1:] or ["edge", "health", "sso", "gateway", "app", "kb", "cms", "bench"]
     for name in only:
         globals()[name]()
     print()

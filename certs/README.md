@@ -12,7 +12,7 @@ obtained from a CA.
 The certificate must cover `demo.pacod.io` and `*.demo.pacod.io`, and `*.<DEMO_SITE_DOMAIN>`, the
 CMS's websites' own domain (demo.env; e.g. `*.pacod-sites.net`): one certificate with all three
 names, since the edge serves just the one. One wildcard level is enough: `app.`, `id.`,
-`console.`, `gw.`, `studio.`, `kb.`, `grafana.`, `mail.`, `prometheus.` under the first, and the
+`console.`, `gw.`, `studio.`, `kb.`, `bench.`, `grafana.`, `mail.`, `prometheus.` under the first, and the
 websites `cms.` and `minimal.` (and any made in the studio) under the second. With
 `DEMO_SITE_DOMAIN_SHARED=true` and the websites under `DEMO_DOMAIN` itself, `*.demo.pacod.io`
 covers them too, and two names are enough. `make preflight` warns when it does not cover them.
