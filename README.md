@@ -171,8 +171,8 @@ the visitor's own zone and how long until the next reset; `make urls` says it to
   settings added in its UI, and the reports published to the gateway console. To keep a report,
   download it (its run's page, *Download the report*); the console takes it back by upload
   (*Platform → Testing → Benchmarks*). A baseline from before
-  pacod-benchmark joined the stack has no token for it: every reset makes a new one, until
-  `make baseline` keeps one.
+  pacod-benchmark joined the stack has no token for it, and its admin has no `bench.admin`: every
+  reset's bootstrap makes the token and gives the role again, until `make baseline` keeps both.
 - **`make reset`** does the same as the nightly reset, now. Both stop every service but the edge
   (the home page stays up), put the baseline back, start the stack and run the bootstrap again,
   which applies what `demo.local.env` has gained since the baseline (a provider key). The admin's
@@ -266,7 +266,9 @@ migrate again at each start.
 - **The bootstrap** ([scripts/bootstrap.py](scripts/bootstrap.py)) drives the products' own
   scripts: pacod-ap's gateway and identity bootstrap and pacod-cms's provisioner. It also makes
   pacod-benchmark's token for the gateway's management API (a platform admin: the benchmark sets
-  up and removes an organisation of its own for every run).
+  up and removes an organisation of its own for every run). Last, it gives the admin every role of
+  `PID_BOOTSTRAP_ADMIN_ROLES` its account lacks, and takes none away: pacod-id gives them only to
+  the account it creates, so an account older than a product never got that product's role.
 
 ## Troubleshooting
 
@@ -283,4 +285,5 @@ migrate again at each start.
 | The CMS's websites have no articles | Their demo content failed on the first start, and the studio does not try again. `make logs S=cms-studio` says why ("Could not store the demo picture ..." was the CMS writing its files as another user than the one owning `.state/`, fixed). Then `make build`, `make up` and `make cms-seed` per website ([The CMS's demo websites](#the-cmss-demo-websites)). |
 | `baseline: another save or restore is running` | A reset is running (`docker logs pacod-demo-reset`); if none is, one was interrupted: remove `.state/baseline.lock`. |
 | The home page announces no nightly reset | There is no baseline yet (`make urls` says so): `make baseline`. |
+| The admin is refused in the benchmark (or another product added later) | Its account is older than the product's role in `PID_BOOTSTRAP_ADMIN_ROLES`: `make bootstrap` gives it, then `make baseline` keeps it through the nightly reset. |
 | Chat answers are "echo: ..." or off-topic | That is the mock provider: set a provider key in demo.local.env and run `make bootstrap`. |

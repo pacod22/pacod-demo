@@ -13,6 +13,9 @@ products already ship, pointed at the demo's files instead of a checkout's.
 2. pacod-benchmark's admin token (BENCH_GW_ADMIN_TOKEN): a platform admin of the gateway, as the
    benchmark sets up and removes its own organisation, workspaces and keys for every run.
 3. The CMS studio's provisioner account and token (pacod-cms's scripts/id-provisioner.mjs).
+4. The admin's roles: those of PID_BOOTSTRAP_ADMIN_ROLES its account lacks. pacod-id gives them
+   only when it creates the account, so an account older than a product (one a reset brings back
+   from a baseline made before pacod-benchmark joined, say) never got that product's role.
 
 Every step keeps what still works, so a second run changes nothing. All results go to
 /state/bootstrap.env; nothing secret is printed. scripts/render-env.sh then hands them to the
@@ -21,9 +24,15 @@ services, and `make up` recreates the ones whose settings changed.
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import http.cookies
 import os
+import secrets
 import subprocess
 import sys
+import time
+import urllib.parse
 from pathlib import Path
 
 STATE = Path("/state")
@@ -114,11 +123,100 @@ def bench(api: gw.Api) -> None:
     say("bench: made BENCH_GW_ADMIN_TOKEN (platform admin)")
 
 
+class IdSession:
+    """pacod-id's hosted pages' API as the bootstrap admin, as pacod-cms's id-provisioner.mjs uses
+    it: an authorize request opens a flow, its password step sets the realm's session cookie, and
+    /ui-api/v1/admin is then the admin API as that person. Writes there need the issuer's Origin."""
+
+    def __init__(self, email: str, password: str):
+        self.jar = http.cookies.SimpleCookie()
+        verifier = secrets.token_urlsafe(48)
+        digest = hashlib.sha256(verifier.encode()).digest()
+        challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+        query = urllib.parse.urlencode(
+            {
+                "response_type": "code",
+                "client_id": gw.SMOKE_CLIENT,
+                "redirect_uri": gw.SMOKE_REDIRECT,
+                "scope": "openid",
+                "state": secrets.token_hex(16),
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+            }
+        )
+        status, _, headers = gw.request("GET", f"{ISSUER}/oidc/authorize?{query}")
+        self.absorb(headers)
+        to = urllib.parse.urljoin(ISSUER, headers.get("Location", ""))
+        flow = urllib.parse.parse_qs(urllib.parse.urlparse(to).query).get("flow", [None])[0]
+        if not flow:
+            gw.fail(f"pacod-id opened no sign-in flow ({status})")
+        status, step = self.call(
+            "POST", f"/ui-api/v1/flows/{flow}/password", {"email": email, "password": password}
+        )
+        if not isinstance(step, dict) or step.get("next") != "redirect":
+            gw.fail(f"signing in to pacod-id as the bootstrap admin failed ({status}): {gw.short(step)}")
+
+    def absorb(self, headers) -> None:
+        for value in headers.get_all("Set-Cookie") or []:
+            self.jar.load(value)
+
+    def call(self, method: str, path: str, body=None):
+        cookie = "; ".join(f"{k}={m.value}" for k, m in self.jar.items())
+        status, data, headers = gw.request(
+            method, f"{ISSUER}{path}", body=body, headers={"Cookie": cookie, "Origin": ISSUER}
+        )
+        self.absorb(headers)
+        return status, data
+
+
+def admin_roles() -> None:
+    # The roles pacod-id was told to give, from the file it reads them from. Added as the admin
+    # itself, whose id.admin may give any role; none is ever taken away.
+    roles = gw.read_env(STATE / "env" / "id.env").get("PID_BOOTSTRAP_ADMIN_ROLES", "")
+    wanted = [r for r in roles.split(",") if r]
+    ident = gw.read_env(gw.ID_ENV)
+    session = IdSession(ident["PID_BOOTSTRAP_ADMIN_EMAIL"], ident["PID_BOOTSTRAP_ADMIN_PASSWORD"])
+    status, me = session.call("GET", "/ui-api/v1/account")
+    if status != 200:
+        gw.fail(f"pacod-id did not say who the bootstrap admin is ({status}): {gw.short(me)}")
+    account = me["account"]["id"]
+    status, listed = session.call("GET", "/ui-api/v1/admin/bindings")
+    if status != 200:
+        gw.fail(f"pacod-id did not list the bootstrap admin's roles ({status}): {gw.short(listed)}")
+    held = {b["role"] for b in listed["bindings"] if b["scope"] == "platform"}
+    missing = [r for r in wanted if r not in held]
+    if not missing:
+        say("admin: holds every role of PID_BOOTSTRAP_ADMIN_ROLES")
+        return
+    # A product's roles exist once its service has pushed its catalogue, which on a stack that
+    # has just started may be a moment away.
+    for _ in range(30):
+        waiting = []
+        for role in missing:
+            binding = {"principal": account, "role": role, "scope": "platform"}
+            status, answer = session.call("POST", "/ui-api/v1/admin/bindings", binding)
+            error = answer.get("error", {}) if isinstance(answer, dict) else {}
+            code = error.get("details", {}).get("code")
+            if status == 201:
+                say(f"admin: gave the account {role}, which it lacked")
+            elif code == "unknown_role":
+                waiting.append(role)
+            elif code != "binding_exists":
+                gw.fail(f"pacod-id refused the bootstrap admin {role} ({status}): {gw.short(answer)}")
+        missing = waiting
+        if not missing:
+            return
+        time.sleep(2)
+    for role in missing:
+        say(f"admin: {role} waits for its product's catalogue at pacod-id; make bootstrap adds it")
+
+
 def main() -> None:
     OUT.touch(mode=0o600, exist_ok=True)
     api = gateway()
     bench(api)
     cms_provisioner()
+    admin_roles()
     say(f"done; credentials in .state/{OUT.name}")
 
 

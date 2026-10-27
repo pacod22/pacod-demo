@@ -246,6 +246,16 @@ def sso() -> None:
             and not landing.startswith(ISSUER)
         report(ok, f"{name}: its callback opens a session", f"{status} -> {landing[:50] or '(no redirect)'}")
 
+    # pacod-id gives the admin PID_BOOTSTRAP_ADMIN_ROLES only when it creates the account; the
+    # bootstrap gives an older account what it lacks (admin_roles in scripts/bootstrap.py).
+    roles = gw.read_env(Path("/state/env/id.env")).get("PID_BOOTSTRAP_ADMIN_ROLES", "")
+    status, body, _ = follow("GET", f"{ISSUER}/ui-api/v1/admin/bindings", idjar)
+    bindings = body.get("bindings", []) if isinstance(body, dict) else []
+    held = {b["role"] for b in bindings if b.get("scope") == "platform"}
+    missing = [r for r in roles.split(",") if r and r not in held]
+    report(status == 200 and not missing, "the admin holds every role of PID_BOOTSTRAP_ADMIN_ROLES",
+           f"{status}, lacks {', '.join(missing)}: make bootstrap" if missing else f"{len(held)} roles")
+
 
 # ---- 4. The gateway: every product's key works ------------------------------------------------
 def gateway() -> None:
