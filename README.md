@@ -167,9 +167,10 @@ the visitor's own zone and how long until the next reset; `make urls` says it to
   the edge's own data, nor the gateway's response cache, which is kept in memory only: every reset
   empties it. It is kept, compressed, in the Docker volume `pacod-demo-baseline`;
   `make clean` deletes it with the rest.
-- **Benchmarks** go back too: pacod-benchmark's runs, and the reports published to the gateway
-  console. To keep a report, download it (its run's page, *Download the report*); the console
-  takes it back by upload (*Platform → Testing → Benchmarks*). A baseline from before
+- **Benchmarks** go back too: pacod-benchmark's runs, its schedules, the gateways, agents and
+  settings added in its UI, and the reports published to the gateway console. To keep a report,
+  download it (its run's page, *Download the report*); the console takes it back by upload
+  (*Platform → Testing → Benchmarks*). A baseline from before
   pacod-benchmark joined the stack has no token for it: every reset makes a new one, until
   `make baseline` keeps one.
 - **`make reset`** does the same as the nightly reset, now. Both stop every service but the edge

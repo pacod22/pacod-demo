@@ -10,7 +10,8 @@
 # BENCH_GW_ADMIN_URL comes with BENCH_GW_ADMIN_TOKEN: the bootstrap mints the token (a
 # platform-admin token of the gateway, scripts/bootstrap.py), and scripts/render-env.sh names the
 # gateway only once the token is there. Until then the benchmark manages no gateway; make up
-# recreates bench-api after the bootstrap.
+# recreates bench-api after the bootstrap. Further gateways (another installation) are added in
+# the benchmark's UI; their tokens are sealed under BENCH_KEK (scripts/init-secrets.sh).
 services:
   bench-api:
     ports: !reset []
@@ -26,6 +27,7 @@ services:
       BENCH_LOAD_MOCK_URL: http://gw-load-mock:9000
       BENCH_GW_DECLARED: '{"layout": "single", "notes": "pacod-demo: every product on one machine"}'
       BENCH_GW_CONSOLE_URL: ${GW_CONSOLE_ORIGIN}
+      BENCH_KEK: ${BENCH_KEK}
       BENCH_AGENTS: local=http://gw-load-agent:8096
       BENCH_AGENT_TOKEN: ${TESTER_LOAD_TOKEN}
       BENCH_AGENT_PLACEMENT: local=in_stack

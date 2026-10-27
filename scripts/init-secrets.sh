@@ -55,6 +55,8 @@ need BENCH_ID_UI_SECRET hex 32
 need BENCH_ID_SERVICE_SECRET hex 32
 need PGW_UI_SESSION_SECRET hex 32
 need BENCH_UI_SESSION_SECRET hex 32
+# pacod-benchmark: the key the tokens of gateways added in its UI are sealed under.
+need BENCH_KEK b64 32
 
 # pacod-gw.
 need PGW_KEK b64 32
