@@ -273,8 +273,13 @@ migrate again at each start.
   `/internal/v1/ai-gateway` with a pacod-id service token of its own (`CMS_ADMIN_TOKEN`, an account
   "pacod-demo cms admin" holding `cms.platform_admin`, kept while the studio takes it). The studio
   uses the stored key from its next call. `PACOD_GW_API_KEY` in cms's variables stays as the
-  fallback, and a studio that is down or older than the API keeps using it. `make verify` checks
-  that the studio holds the key.
+  fallback, and a studio that is down or older than the API keeps using it. Then, the same way,
+  the models (`/internal/v1/ai-models`): `CMS_AI_MODEL` as the default and
+  `CMS_AI_MODEL_<FEATURE>` (translate, pdf, assist, vision, design) per feature, a blank one meaning
+  the default. demo.env decides, so a choice made on the studio's installation screen gives way at
+  the next bootstrap; the studio refuses a model the gateway does not offer, or one that cannot do
+  a feature's work (alt text needs images), and the bootstrap says so. `make verify` checks that
+  the studio holds the key and uses those models.
 
 ## Troubleshooting
 

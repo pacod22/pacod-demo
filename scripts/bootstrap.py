@@ -19,7 +19,9 @@ products already ship, pointed at the demo's files instead of a checkout's.
 5. The CMS studio's gateway key, handed over live: PUT to cms-studio's /internal/v1/ai-gateway
    with a pacod-id service token of its own (CMS_ADMIN_TOKEN, an account holding
    cms.platform_admin). The studio stores the pair and uses it from the next call. PACOD_GW_API_KEY
-   in cms.env stays, as the fallback the stored pair overrides.
+   in cms.env stays, as the fallback the stored pair overrides. Then, the same way, the models
+   (/internal/v1/ai-models): CMS_AI_MODEL as the default and CMS_AI_MODEL_<FEATURE> per feature,
+   a blank one clearing that feature's choice, so demo.env decides; PACOD_AI_MODEL stays too.
 
 Every step keeps what still works, so a second run changes nothing. All results go to
 /state/bootstrap.env; nothing secret is printed. scripts/render-env.sh then hands them to the
@@ -73,6 +75,8 @@ DATA_URL = "http://pacod-gw:8080"
 # The studio's internal API, on pacod-net (Caddy does not route /internal/).
 CMS_STUDIO = "http://cms-studio:7443"
 CMS_ADMIN_NAME = "pacod-demo cms admin"
+# The studio's AI features (pacod-cms's AiFeature), each set by CMS_AI_MODEL_<NAME>.
+CMS_AI_FEATURES = ("translate", "pdf", "assist", "vision", "design")
 
 
 def say(msg: str) -> None:
@@ -290,6 +294,38 @@ def cms_admin_token() -> str | None:
     return made["token"]
 
 
+def cms_put(path: str, token: str, body: dict):
+    """A PUT to the studio, retried while pacod-id's feed has not yet told it about a new binding
+    (403) or it is catching up (503, unreachable)."""
+    for _ in range(20):
+        status, answer = cms_call("PUT", path, token, body)
+        if status not in (0, 403, 503):
+            return status, answer
+        time.sleep(2)
+    return status, answer
+
+
+def cms_models(token: str) -> None:
+    """demo.env's models into the running studio: the default and every feature, blank clearing
+    that feature's choice. The studio checks each against what the gateway offers this key and
+    what the feature needs; a refusal is said, PACOD_AI_MODEL then applies."""
+    default = os.environ.get("CMS_AI_MODEL", "").strip()
+    features = {f: os.environ.get(f"CMS_AI_MODEL_{f.upper()}", "").strip() for f in CMS_AI_FEATURES}
+    status, answer = cms_put("/internal/v1/ai-models", token, {"default": default, "features": features})
+    chosen = ", ".join(f"{f} {m}" for f, m in features.items() if m) or "none per feature"
+    if status == 200:
+        say(f"cms: the studio uses {default or 'PACOD_AI_MODEL'} by default ({chosen})")
+    elif status == 422 and isinstance(answer, dict) and answer.get("code") == "unchanged":
+        say(f"cms: the studio already uses {default or 'PACOD_AI_MODEL'} by default ({chosen})")
+    elif status == 422 and isinstance(answer, dict):
+        say(f"cms: the studio refused the models ({answer.get('code')} for {answer.get('field')}: "
+            f"{answer.get('error')}); fix CMS_AI_MODEL* in demo.env and make bootstrap")
+    elif status == 404:
+        say("cms: the studio predates /internal/v1/ai-models (rebuild pacod-cms); PACOD_AI_MODEL applies")
+    else:
+        say(f"cms: the studio did not take the models ({status}); PACOD_AI_MODEL applies")
+
+
 def cms_gateway_key() -> None:
     """CMS_GW_KEY into the running studio, with the gateway's address: one PUT, then one call
     through it. A studio that is down or predates the API keeps PACOD_GW_API_KEY from cms.env."""
@@ -300,17 +336,13 @@ def cms_gateway_key() -> None:
     token = cms_admin_token()
     if not token:
         return
-    body = {"url": DATA_URL, "apiKey": key}
-    # A new binding reaches the studio through pacod-id's feed within seconds; 403 until then.
-    for _ in range(20):
-        status, answer = cms_call("PUT", "/internal/v1/ai-gateway?test=true", token, body)
-        if status not in (0, 403, 503):
-            break
-        time.sleep(2)
+    status, answer = cms_put("/internal/v1/ai-gateway?test=true", token, {"url": DATA_URL, "apiKey": key})
     if status == 200:
         test = (answer or {}).get("test", {})
         how = f"tested, {test.get('millis')} ms" if test.get("ok") else f"test failed: {test.get('error')}"
         say(f"cms: the studio took CMS_GW_KEY live ({how})")
+        # The models are checked against the list the gateway gives the key just set.
+        cms_models(token)
     elif status == 404:
         say("cms: the studio predates /internal/v1/ai-gateway (rebuild pacod-cms); PACOD_GW_API_KEY applies")
     elif status in (0, 503):

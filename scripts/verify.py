@@ -296,6 +296,16 @@ def cms_stored_key(creds: dict[str, str]) -> None:
           and body.get("keyHint") == "…" + key[-4:])
     detail = f"{status}, {body.get('source')} {body.get('keyHint')}" if isinstance(body, dict) else f"{status}"
     report(ok, "pacod-cms: the studio holds the key (stored, live)", detail if ok else f"{detail}: make bootstrap")
+    status, body, _ = http("GET", "http://cms-studio:7443/internal/v1/ai-models",
+                           headers={"Authorization": f"Bearer {token}"})
+    wanted = {f: E.get(f"CMS_AI_MODEL_{f.upper()}", "") or E.get("CMS_AI_MODEL", "")
+              for f in ("translate", "pdf", "assist", "vision", "design")}
+    held = ({f: v.get("model") for f, v in body.get("features", {}).items()}
+            if status == 200 and isinstance(body, dict) else {})
+    differ = [f"{f} {held.get(f)} not {m}" for f, m in wanted.items() if m and held.get(f) != m]
+    report(status == 200 and not differ, "pacod-cms: the studio uses demo.env's models",
+           f"{status}, " + ("; ".join(differ) + ": make bootstrap" if differ else
+                            ", ".join(f"{f} {m}" for f, m in held.items())))
 
 
 def response_cache(key: str | None, model: str) -> None:
