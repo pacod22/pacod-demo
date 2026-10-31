@@ -278,7 +278,24 @@ def gateway() -> None:
                                body={"model": model, "messages": [{"role": "user", "content": "ping"}]})
         text = body["choices"][0]["message"]["content"] if status == 200 else str(body)[:120]
         report(status == 200, f"{product}: a chat completion", f"{status} {text[:50]!r}")
+    cms_stored_key(creds)
     response_cache(creds.get("GATEWAY_KEY_API"), model)
+
+
+def cms_stored_key(creds: dict[str, str]) -> None:
+    """The bootstrap hands CMS_GW_KEY to the running studio (/internal/v1/ai-gateway): the studio
+    says it uses a stored pair whose key ends as CMS_GW_KEY does. Only the last four characters
+    are ever answered."""
+    token, key = creds.get("CMS_ADMIN_TOKEN"), creds.get("CMS_GW_KEY")
+    if not token or not key:
+        report(False, "pacod-cms: the studio holds the key", "CMS_ADMIN_TOKEN or CMS_GW_KEY missing (make bootstrap)")
+        return
+    status, body, _ = http("GET", "http://cms-studio:7443/internal/v1/ai-gateway",
+                           headers={"Authorization": f"Bearer {token}"})
+    ok = (status == 200 and isinstance(body, dict) and body.get("source") == "stored"
+          and body.get("keyHint") == "…" + key[-4:])
+    detail = f"{status}, {body.get('source')} {body.get('keyHint')}" if isinstance(body, dict) else f"{status}"
+    report(ok, "pacod-cms: the studio holds the key (stored, live)", detail if ok else f"{detail}: make bootstrap")
 
 
 def response_cache(key: str | None, model: str) -> None:

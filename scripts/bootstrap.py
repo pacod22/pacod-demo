@@ -16,6 +16,10 @@ products already ship, pointed at the demo's files instead of a checkout's.
 4. The admin's roles: those of PID_BOOTSTRAP_ADMIN_ROLES its account lacks. pacod-id gives them
    only when it creates the account, so an account older than a product (one a reset brings back
    from a baseline made before pacod-benchmark joined, say) never got that product's role.
+5. The CMS studio's gateway key, handed over live: PUT to cms-studio's /internal/v1/ai-gateway
+   with a pacod-id service token of its own (CMS_ADMIN_TOKEN, an account holding
+   cms.platform_admin). The studio stores the pair and uses it from the next call. PACOD_GW_API_KEY
+   in cms.env stays, as the fallback the stored pair overrides.
 
 Every step keeps what still works, so a second run changes nothing. All results go to
 /state/bootstrap.env; nothing secret is printed. scripts/render-env.sh then hands them to the
@@ -27,12 +31,15 @@ from __future__ import annotations
 import base64
 import hashlib
 import http.cookies
+import json
 import os
 import secrets
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
 from pathlib import Path
 
 STATE = Path("/state")
@@ -63,6 +70,9 @@ ISSUER = os.environ["PACOD_ID_ISSUER"]
 # The management API listens on pacod-admin-net alone, under this alias.
 ADMIN_URL = "http://pacod-gw-admin:8081"
 DATA_URL = "http://pacod-gw:8080"
+# The studio's internal API, on pacod-net (Caddy does not route /internal/).
+CMS_STUDIO = "http://cms-studio:7443"
+CMS_ADMIN_NAME = "pacod-demo cms admin"
 
 
 def say(msg: str) -> None:
@@ -211,12 +221,112 @@ def admin_roles() -> None:
         say(f"admin: {role} waits for its product's catalogue at pacod-id; make bootstrap adds it")
 
 
+def cms_call(method: str, path: str, token: str, body=None):
+    """(status, parsed body) of the studio's internal API; status 0 when it cannot be reached --
+    gw.request would end the bootstrap, and a studio that is not up must cost this step only."""
+    data = json.dumps(body).encode() if body is not None else None
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(f"{CMS_STUDIO}{path}", data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            status, raw = r.status, r.read()
+    except urllib.error.HTTPError as e:
+        status, raw = e.code, e.read()
+    except (urllib.error.URLError, OSError):
+        return 0, None
+    try:
+        return status, json.loads(raw) if raw else None
+    except json.JSONDecodeError:
+        return status, raw.decode("utf-8", "replace")
+
+
+def cms_admin_token() -> str | None:
+    """A pacod-id service token holding cms.platform_admin, which /internal/v1/ai-gateway needs
+    (the studio's provisioner holds cms.provisioner only). Kept while the studio takes it; else
+    the account is made or found, bound, and given one new token, every older one revoked."""
+    have = gw.read_env(OUT).get("CMS_ADMIN_TOKEN")
+    if have:
+        status, _ = cms_call("GET", "/internal/v1/ai-gateway", have)
+        if status in (200, 404, 503, 0):
+            # 404: a studio older than the API; 503/0: down or catching up. Not the token's fault.
+            return have
+        say(f"cms: CMS_ADMIN_TOKEN is refused ({status}); making a new one")
+    ident = gw.read_env(gw.ID_ENV)
+    session = IdSession(ident["PID_BOOTSTRAP_ADMIN_EMAIL"], ident["PID_BOOTSTRAP_ADMIN_PASSWORD"])
+    status, listed = session.call("GET", "/ui-api/v1/admin/service-accounts")
+    if status != 200:
+        gw.fail(f"pacod-id did not list its service accounts ({status}): {gw.short(listed)}")
+    account = next((a for a in listed.get("service_accounts", [])
+                    if a.get("name") == CMS_ADMIN_NAME and a.get("status") != "disabled"), None)
+    if account is None:
+        status, account = session.call("POST", "/ui-api/v1/admin/service-accounts", {"name": CMS_ADMIN_NAME})
+        if status != 201:
+            gw.fail(f"pacod-id did not make the CMS admin account ({status}): {gw.short(account)}")
+    # The role before the token: a token whose binding then failed would be a live credential
+    # nobody recorded. cms.* roles exist once the studio has pushed its catalogue.
+    for _ in range(30):
+        binding = {"principal": account["id"], "role": "cms.platform_admin", "scope": "platform"}
+        status, answer = session.call("POST", "/ui-api/v1/admin/bindings", binding)
+        code = (answer.get("error", {}).get("details", {}).get("code") if isinstance(answer, dict) else None)
+        if status == 201 or code == "binding_exists":
+            break
+        if code != "unknown_role":
+            gw.fail(f"pacod-id refused the CMS admin cms.platform_admin ({status}): {gw.short(answer)}")
+        time.sleep(2)
+    else:
+        say("cms: cms.platform_admin waits for the studio's catalogue at pacod-id; make bootstrap sets the key")
+        return None
+    status, made = session.call("POST", f"/ui-api/v1/admin/service-accounts/{account['id']}/tokens", {})
+    if status != 201 or not isinstance(made, dict) or not made.get("token"):
+        gw.fail(f"pacod-id did not give the CMS admin a token ({status})")
+    status, tokens = session.call("GET", f"/ui-api/v1/admin/service-accounts/{account['id']}/tokens")
+    for t in (tokens or {}).get("tokens", []) if status == 200 else []:
+        if t.get("id") != made.get("id") and t.get("status") != "revoked":
+            session.call("DELETE", f"/ui-api/v1/admin/service-tokens/{t['id']}")
+    gw.write_env(OUT, {"CMS_ADMIN_TOKEN": made["token"], "CMS_ADMIN_ACCOUNT": account["id"]})
+    say("cms: made CMS_ADMIN_TOKEN (a service account holding cms.platform_admin)")
+    return made["token"]
+
+
+def cms_gateway_key() -> None:
+    """CMS_GW_KEY into the running studio, with the gateway's address: one PUT, then one call
+    through it. A studio that is down or predates the API keeps PACOD_GW_API_KEY from cms.env."""
+    key = gw.read_env(OUT).get("CMS_GW_KEY")
+    if not key:
+        say("cms: no CMS_GW_KEY to hand over")
+        return
+    token = cms_admin_token()
+    if not token:
+        return
+    body = {"url": DATA_URL, "apiKey": key}
+    # A new binding reaches the studio through pacod-id's feed within seconds; 403 until then.
+    for _ in range(20):
+        status, answer = cms_call("PUT", "/internal/v1/ai-gateway?test=true", token, body)
+        if status not in (0, 403, 503):
+            break
+        time.sleep(2)
+    if status == 200:
+        test = (answer or {}).get("test", {})
+        how = f"tested, {test.get('millis')} ms" if test.get("ok") else f"test failed: {test.get('error')}"
+        say(f"cms: the studio took CMS_GW_KEY live ({how})")
+    elif status == 404:
+        say("cms: the studio predates /internal/v1/ai-gateway (rebuild pacod-cms); PACOD_GW_API_KEY applies")
+    elif status in (0, 503):
+        say(f"cms: the studio did not answer ({status}); PACOD_GW_API_KEY applies, make bootstrap retries")
+    else:
+        # The last step, and PACOD_GW_API_KEY still applies: said, never the end of make up.
+        say(f"cms: the studio refused the gateway key ({status}): {gw.short(answer)}; PACOD_GW_API_KEY applies")
+
+
 def main() -> None:
     OUT.touch(mode=0o600, exist_ok=True)
     api = gateway()
     bench(api)
     cms_provisioner()
     admin_roles()
+    cms_gateway_key()
     say(f"done; credentials in .state/{OUT.name}")
 
 

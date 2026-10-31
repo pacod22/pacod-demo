@@ -269,6 +269,12 @@ migrate again at each start.
   up and removes an organisation of its own for every run). Last, it gives the admin every role of
   `PID_BOOTSTRAP_ADMIN_ROLES` its account lacks, and takes none away: pacod-id gives them only to
   the account it creates, so an account older than a product never got that product's role.
+  Then it hands the CMS studio its gateway key live: a `PUT` to cms-studio's
+  `/internal/v1/ai-gateway` with a pacod-id service token of its own (`CMS_ADMIN_TOKEN`, an account
+  "pacod-demo cms admin" holding `cms.platform_admin`, kept while the studio takes it). The studio
+  uses the stored key from its next call. `PACOD_GW_API_KEY` in cms's variables stays as the
+  fallback, and a studio that is down or older than the API keeps using it. `make verify` checks
+  that the studio holds the key.
 
 ## Troubleshooting
 
