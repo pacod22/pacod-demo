@@ -71,6 +71,12 @@ own clients only.
 - **Everything else** carries its owner's prefix: `id-`, `gw-`, `ap-`, `cms-`, `kb-`, `bench-`.
 - **Volume keys** follow the same rule (`pacod-postgres-data`, `gw-clickhouse-data`,
   `cms-mongo-data`, `kb-ui-data`, ...).
+- **One shared volume is external**, like the networks: `pacod-hf-cache`, the embedding models
+  (`pacod-embeddings`, and pacod-kb's tokenizer in the full stack). Declared `external: true` in
+  pacod-ap's app file and in `platform.yml`, and created by the Makefiles next to the networks
+  (`make ensure-pacod-net`, `make network`), it belongs to no compose project: no `down -v` or
+  `make clean` deletes it, so a teardown never costs the 2–4 GB download again. Only
+  `make clean MODELS=1` removes it.
 - Host ports are unchanged in each repo's standalone mode; the full stack publishes only its edge.
 
 ### Shared components

@@ -5,7 +5,9 @@
 #   make verify    check that the stack works as one platform
 #   make reset     undo every change: back to the baseline (also every night, DEMO_RESET_TIME)
 #   make down      stop; the data stays
-#   make clean     stop and delete everything the demo made (data, state; IMAGES=1: images too)
+#   make start     start it again quickly (no build, bootstrap or seed); redeploy S=… one service
+#   make clean     stop and delete everything the demo made (data, state; IMAGES=1: images too;
+#                  the downloaded models only with MODELS=1)
 #
 # Needs Docker (with Compose 2.24 or newer) and make; everything else runs in containers.
 
@@ -35,8 +37,11 @@ CMS_CLI = $(COMPOSE) run --rm --no-deps -T cms-studio --spring.main.web-applicat
 	--pacod.bootstrap.enabled=false --pacod.id.enabled=false --pacod.jobs.runner.enabled=false \
 	--logging.level.root=WARN --logging.level.io.pacod.cms.studio.site=INFO --app.log.dir=/tmp/logs
 WAIT := --wait --wait-timeout 2400
+# The models of pacod-embeddings, an external volume shared with pacod-ap's own stacks.
+HF_CACHE := pacod-hf-cache
+HF_CACHE_OLD := pacod-demo_pacod-hf-cache
 
-.PHONY: help up run verify down stop clean remove build status ps logs urls bootstrap \
+.PHONY: help up run start redeploy restart verify down stop clean remove build status ps logs urls bootstrap \
 	preflight network tools init render seed hosts config shots cms-space cms-seed \
 	baseline first-baseline reset scheduler reset-image google
 
@@ -47,7 +52,12 @@ help:
 	@echo "  make verify    check the running stack end to end"
 	@echo "  make reset     undo every change: back to the baseline (also every night at DEMO_RESET_TIME)"
 	@echo "  make down      stop it; data is kept"
-	@echo "  make clean     remove it: containers, volumes, generated state (IMAGES=1: images too)"
+	@echo "  make clean     remove it: containers, volumes, generated state (IMAGES=1: images too;"
+	@echo "                 the downloaded models are kept, MODELS=1: those too)"
+	@echo ""
+	@echo "  make start     start a stack that has run before: no build, bootstrap or seed"
+	@echo "  make redeploy S=\"<service>...\"   rebuild and recreate only those services"
+	@echo "  make restart S=\"<service>...\"    restart only those services"
 	@echo ""
 	@echo "  make urls      the addresses and the admin's sign-in"
 	@echo "  make status    the containers and their health"
@@ -75,6 +85,25 @@ up: preflight network tools init render
 
 run: up
 
+# ---- re-deploy ------------------------------------------------------------------------------------
+# Faster than `make up` on a stack that has run before. start: every service from the images there
+# are (nothing built, no bootstrap, seed or baseline). redeploy S="<services>": rebuild those images
+# and recreate only those containers (--no-deps: compose would otherwise rebuild and recreate what
+# they depend on as well, pacod-embeddings among them, which then loads its models again).
+# restart S="<services>": restart them as they are.
+start: network render
+	@test -f .state/secrets.env || { echo "start: no stack yet; run make up" >&2; exit 1; }
+	$(COMPOSE) up -d --remove-orphans --no-build $(WAIT)
+	@$(MAKE) --no-print-directory urls
+
+redeploy: network render
+	@test -n "$(S)" || { echo 'usage: make redeploy S="<service> [<service>...]"' >&2; exit 1; }
+	$(COMPOSE) up -d --no-deps --build $(WAIT) $(S)
+
+restart: render
+	@test -n "$(S)" || { echo 'usage: make restart S="<service> [<service>...]"' >&2; exit 1; }
+	$(COMPOSE) restart $(S)
+
 # The machine's configuration: git ignores it; the first run copies the committed template.
 demo.env:
 	@cp demo.env.example $@
@@ -90,6 +119,15 @@ network:
 	@docker network inspect pacod-admin-net >/dev/null 2>&1 || docker network create --internal pacod-admin-net >/dev/null
 	@test "$$(docker network inspect -f '{{.Internal}}' pacod-admin-net)" = true || \
 		{ echo "pacod-admin-net is not internal: remove it (docker network rm pacod-admin-net) and run make network" >&2; exit 1; }
+	@# The models (platform.yml): external, so no teardown of the project deletes them. The first
+	@# time, the models of the project's own volume it replaces are copied over.
+	@docker volume inspect $(HF_CACHE) >/dev/null 2>&1 || { \
+		docker volume create $(HF_CACHE) >/dev/null; \
+		if docker volume inspect $(HF_CACHE_OLD) >/dev/null 2>&1; then \
+			echo "network: copying the models from $(HF_CACHE_OLD) (make clean removes it)"; \
+			docker run --rm -v $(HF_CACHE_OLD):/from:ro -v $(HF_CACHE):/to alpine:3.20 cp -a /from/. /to/ || \
+				{ docker volume rm $(HF_CACHE) >/dev/null; echo "network: the copy failed; run it again" >&2; exit 1; }; \
+		fi; }
 
 tools:
 	@docker image inspect $(TOOLS) >/dev/null 2>&1 || docker build -q -t $(TOOLS) tools/ >/dev/null
@@ -252,6 +290,13 @@ clean:
 	@for net in pacod-admin-net pacod-net; do \
 		if [ -z "$$(docker ps -aq --filter network=$$net)" ]; then \
 			docker network rm $$net >/dev/null 2>&1 || true; fi; done
+	@# The models are not the project's (external): kept unless MODELS=1, and not while another
+	@# stack (pacod-ap's own) still mounts them.
+	@if [ "$(MODELS)" = 1 ]; then \
+		if [ -n "$$(docker ps -aq --filter volume=$(HF_CACHE))" ]; then \
+			echo "clean: $(HF_CACHE) is still mounted by another stack; kept" >&2; \
+		else docker volume rm $(HF_CACHE) >/dev/null 2>&1 || true; echo "clean: the models removed"; fi; \
+	else echo "clean: the models ($(HF_CACHE)) are kept; MODELS=1 deletes them"; fi
 	@echo "clean: done"
 
 remove: clean

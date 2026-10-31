@@ -9,7 +9,9 @@ make up        # build, start, bootstrap; prints the addresses and the admin's p
 make verify    # check that everything works together
 make reset     # undo every change: back to the baseline (also every night, 05:00 UTC by default)
 make down      # stop (data is kept)
-make clean     # remove everything the demo made (IMAGES=1: its images too)
+make start     # start it again quickly: no build, bootstrap or seed
+make redeploy S=ap-api   # rebuild and recreate only the named services (restart S=… restarts them)
+make clean     # remove everything the demo made (IMAGES=1: its images too; MODELS=1: the models too)
 make shots     # retake the home page's screenshots from the running stack
 ```
 
@@ -70,7 +72,8 @@ photographs, its own pages, menus and journal issues, and five invented advertis
 HTML5 creatives. A website whose demo content failed then stays empty, and is never filled again by
 itself. `make up` starts the images it finds and never rebuilds them, so after pulling the
 repositories run `make build` first: the studio's image carries the demo content, the template
-sets and the seeds.
+sets and the seeds. (When only one product changed, `make redeploy S="<service>..."` rebuilds and
+recreates just those services; see [Re-deploying](#re-deploying).)
 
 - **From scratch**, every website with its content (this also deletes the accounts, keys and
   data of every product; demo.env and demo.local.env stay): pull the six repositories, then
@@ -207,7 +210,9 @@ reference facts only. It is a ~10 GB image and may use 7 GiB of memory, so it wa
 Docker.
 
 **The embedding backend is fixed at the first `make up`**: the stored vectors depend on it, so
-switching between `bge` and `hash` later needs `make clean`.
+switching between `bge` and `hash` later needs `make clean`. The downloaded models live in the
+external volume `pacod-hf-cache` (shared with pacod-ap's own stacks), which `make clean` keeps, so
+the next `make up` does not download them again; `make clean MODELS=1` deletes them.
 
 **Logs.** Every product logs the same way ([docs/LOGGING.md](docs/LOGGING.md)): one event per line
 on its container's output (`make logs S=<service>`), with the same keys everywhere (`timestamp`,
@@ -235,6 +240,30 @@ make baseline   # ...kept as the state every nightly reset returns to
 
 Without the last two steps every reset puts back the older releases' data, which the products then
 migrate again at each start.
+
+## Re-deploying
+
+`make up` and `make build` touch the whole stack. For a stack that has run before:
+
+```sh
+make start                              # start every service from the images there are: no build,
+                                        # bootstrap, seed or baseline (after make down, or a reboot)
+make redeploy S="ap-api ap-admin-api"   # rebuild those images, recreate only those containers
+make restart S=kb-pipeline              # restart them as they are
+```
+
+`redeploy` passes `--no-deps`: compose would otherwise rebuild and recreate what the services
+depend on as well, `pacod-embeddings` among them, which then loads its models again (tens of
+seconds on CPU, while everything that waits for it waits too). `make redeploy S=pacod-embeddings`
+when the embeddings service itself changed. A service that reads the bootstrap's credentials
+(`ap-api`, `cms-studio`, …) keeps them across a redeploy; after adding a provider key run
+`make bootstrap` instead.
+
+**The models** (bge-m3 and its reranker, about 4 GB) are downloaded once per machine into the
+Docker volume `pacod-hf-cache`, made by `make up` / `make start`. It belongs to no compose project
+(pacod-ap's own stacks use it too), so `make down`, `make reset` and `make clean` keep it;
+`make clean MODELS=1` deletes it, unless another stack still mounts it. On a machine that ran the
+demo before, the first `make up` copies the models over from the old `pacod-demo_pacod-hf-cache`.
 
 ## How it is put together
 

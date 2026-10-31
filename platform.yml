@@ -228,4 +228,8 @@ volumes:
   pacod-alertmanager-data:
   pacod-grafana-data:
   # The models of the shared embeddings service; the knowledge base reads the tokenizer from it.
+  # External (made by `make network`, shared with pacod-ap's own stacks): it carries no project
+  # label, so `make clean` keeps it and the next `make up` skips the 4 GB download;
+  # `make clean MODELS=1` deletes it. Declared the same way in pacod-ap's compose file.
   pacod-hf-cache:
+    external: true
