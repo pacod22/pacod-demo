@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+{{- /* A Caddy template (config/Caddyfile), like index.html; the declaration above must stay the first
+	bytes. Only the home page's own host: each CMS website answers its own /sitemap.xml. */ -}}
+{{- $d := env "DEMO_DOMAIN" }}{{ $s := env "DEMO_URL_SCHEME" }}{{ $p := "" }}{{ with env "DEMO_URL_PORT" }}{{ $p = printf ":%s" . }}{{ end }}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+	<url>
+		<loc>{{$s}}://{{$d}}{{$p}}/</loc>
+	</url>
+</urlset>

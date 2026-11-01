@@ -1,0 +1,35 @@
+{{- /* A Caddy template (config/Caddyfile), like index.html: the addresses are made from the demo's
+	domain, scheme and port, and the CMS's hosts. The llms.txt format (llmstxt.org): what the
+	demo is, for a language model, with the links to read further. It never names the admin. */ -}}
+{{- $d := env "DEMO_DOMAIN" }}{{ $studio := env "CMS_STUDIO_HOST" }}{{ $cms := env "CMS_DEMO_HOST" }}{{ $minimal := env "CMS_MINIMAL_HOST" }}{{ $space := env "CMS_SPACE_HOST" }}{{ $s := env "DEMO_URL_SCHEME" }}{{ $p := "" }}{{ with env "DEMO_URL_PORT" }}{{ $p = printf ":%s" . }}{{ end }}
+{{- $public := eq (env "DEMO_PUBLIC") "true" }}{{ $reset := eq (env "DEMO_RESET") "true" -}}
+# pacod demo
+
+> pacod, open source: a high-performance AI gateway (pacod-gw), an AI-assisted CMS (pacod-cms) and an easy agent builder (pacod-ap), working as one platform with one sign-in (pacod-id), beside a RAG knowledge base (pacod-kb) and the gateway's benchmarks (pacod-benchmark). This demo runs all of them together on one machine.
+
+Every person signs in through pacod-id; every model call goes through pacod-gw, so the products on top never hold a provider's key. Each product is a complete product with its own repository; here they share one network, one database server and one sign-in.{{if $reset}} The demo is reset every night at {{env "DEMO_RESET_TIME"}} {{env "DEMO_RESET_TIMEZONE"}}: every change made to it is undone.{{end}}
+
+## Products
+
+- [pacod-gw, the gateway console]({{$s}}://console.{{$d}}{{$p}}/): a high-performance gateway between applications and every LLM provider. A Rust core relays or translates every call (OpenAI, Anthropic and Gemini dialects), keeps provider keys out of the apps, routes across model pools, enforces quotas and prices each request; a SvelteKit console manages it.
+- [pacod-gw, the OpenAI-compatible API]({{$s}}://gw.{{$d}}{{$p}}/v1): the gateway's data plane; it needs a gateway key.
+- [pacod-cms, the studio]({{$s}}://{{$studio}}{{$p}}/): a multi-website CMS with AI-assisted content generation, translation and PDF creation, template sets, advertising and statistics. Java 25, Spring Boot, MongoDB.
+- [Demo Journal]({{$s}}://{{$cms}}{{$p}}/): a CMS demo website on the editorial template set.
+- [Demo Notes]({{$s}}://{{$minimal}}{{$p}}/): a CMS demo website on the minimal template set.
+- [Starward]({{$s}}://{{$space}}{{$p}}/): an image-led space-travel magazine for an invented star system, on the magazine template set, with NASA photographs and animated HTML5 advertising.
+- [pacod-ap, the agent platform]({{$s}}://app.{{$d}}{{$p}}/): build AI agents with full control over their knowledge, models, tools and directives, a visual editor, versioned releases and a review loop. The demo runs the "starter" agent, a small fictional help desk; its [chat]({{$s}}://app.{{$d}}{{$p}}/chat) and [admin console]({{$s}}://app.{{$d}}{{$p}}/dashboard).
+- [pacod-id, identity administration]({{$s}}://id.{{$d}}{{$p}}/admin): one sign-in for people and machines; an OpenID Connect provider with accounts, organisations and role bindings ([discovery]({{$s}}://id.{{$d}}{{$p}}/.well-known/openid-configuration)).
+- [pacod-kb, the knowledge base]({{$s}}://kb.{{$d}}{{$p}}/kb): ingests files and web pages, converts them to Markdown and indexes them for hybrid semantic and keyword search.
+- [pacod-benchmark]({{$s}}://bench.{{$d}}{{$p}}/): measures pacod-gw and other gateways over a matrix of settings; reports are published to the gateway console.
+
+## Platform
+
+- [Grafana]({{$s}}://grafana.{{$d}}{{$p}}/): the dashboards of every product{{if $public}}; asks for the admin's email and password{{end}}.
+- [Mail]({{$s}}://mail.{{$d}}{{$p}}/): every mail the stack sends{{if $public}}; asks for the admin's email and password{{end}}.
+- [Prometheus]({{$s}}://prometheus.{{$d}}{{$p}}/): the metrics, for ad-hoc queries{{if $public}}; asks for the admin's email and password{{end}}.
+
+## Optional
+
+- [pacod on ai.pacod.io](https://ai.pacod.io): the overview of every project.
+- [pacod22 on GitHub](https://github.com/pacod22): the repositories (pacod-gw, pacod-cms, pacod-ap, pacod-id, pacod-kb, pacod-benchmark).
+- [pacod-demo](https://github.com/pacod22/pacod-demo): how this demo is put together and run.

@@ -121,6 +121,11 @@ def edge() -> None:
     else:
         home, hdrs = E["DEMO_ORIGIN"] + "/", {}
     check("home page", home, headers=hdrs, contains=E["CMS_STUDIO_ORIGIN"] + "/")
+    # Its files for crawlers and language models, templates like the page: the origin in them shows
+    # they were rendered.
+    check("home robots.txt", home + "robots.txt", headers=hdrs, contains=f"Sitemap: {E['DEMO_ORIGIN']}/sitemap.xml")
+    check("home sitemap.xml", home + "sitemap.xml", headers=hdrs, contains=f"<loc>{E['DEMO_ORIGIN']}/</loc>")
+    check("home llms.txt", home + "llms.txt", headers=hdrs, contains=E["CMS_STUDIO_ORIGIN"] + "/")
 
 
 # ---- 2. Health of every service ------------------------------------------------------------------

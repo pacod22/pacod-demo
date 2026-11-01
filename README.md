@@ -149,7 +149,10 @@ Analytics, set in demo.env (empty: nothing of Google's on the page, the default)
 cache. demo.env owns those two fields: a value removed there is removed from Starward too.
 Instead of the two verifications, a Search Console domain property (a DNS TXT record on the
 registrable domain) covers both hosts. Each CMS website answers its own `/robots.txt` and
-`/sitemap.xml`, which Search Console takes for Starward.
+`/sitemap.xml`, which Search Console takes for Starward. The home page answers its own too
+([home/robots.txt](home/robots.txt), [home/sitemap.xml](home/sitemap.xml)), and
+[/llms.txt](home/llms.txt): the demo and its addresses for a language model
+([llmstxt.org](https://llmstxt.org)). They are templates like the page, with the demo's addresses.
 
 ## The nightly reset
 

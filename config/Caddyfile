@@ -86,14 +86,18 @@
 
 import /etc/caddy/sites/*.caddy
 
-# The demo's home page (home/): every product, what it is, its admin and its websites. A template:
-# the links are made from DEMO_DOMAIN, DEMO_URL_SCHEME and DEMO_URL_PORT. The bare domain names
-# this block, so it wins over pacod-cms's catch-all (every host no other block names).
+# The demo's home page (home/): every product, what it is, its admin and its websites, with its
+# robots.txt, sitemap.xml and llms.txt. Templates: the links are made from DEMO_DOMAIN,
+# DEMO_URL_SCHEME and DEMO_URL_PORT; the mime list replaces Caddy's default (HTML and text), so it
+# names those too, and the XML a sitemap.xml is served as. The bare domain names this block, so it
+# wins over pacod-cms's catch-all (every host no other block names).
 {$DEMO_HOME_SITE} {
 	{$DEMO_TLS}
 	import demo_access_log
 	root * /srv/home
-	templates
+	templates {
+		mime text/html text/plain text/xml application/xml
+	}
 	file_server
 }
 

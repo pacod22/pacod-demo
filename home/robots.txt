@@ -1,0 +1,7 @@
+{{- /* A Caddy template (config/Caddyfile), like index.html: the addresses are made from the demo's
+	domain, scheme and port. Every product's own host answers for itself; this is the home page's. */ -}}
+{{- $d := env "DEMO_DOMAIN" }}{{ $s := env "DEMO_URL_SCHEME" }}{{ $p := "" }}{{ with env "DEMO_URL_PORT" }}{{ $p = printf ":%s" . }}{{ end -}}
+User-agent: *
+Allow: /
+
+Sitemap: {{$s}}://{{$d}}{{$p}}/sitemap.xml
