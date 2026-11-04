@@ -60,7 +60,7 @@ for r in pacod-id pacod-gw pacod-ap pacod-cms pacod-kb pacod-benchmark pacod-bro
 	# The listeners only servers reach moved to pacod-admin-net in every repository at once; a
 	# checkout from before would call addresses that no longer answer, or refuse the aliases as
 	# listen addresses (pacod-id and pacod-gw before 3872f32 and the gateway's network commit).
-	case $r in pacod-id) app=deploy/compose/docker-compose.yml ;; pacod-gw) app=deploy/docker-compose.yml ;;
+	case $r in pacod-id) app=deploy/compose/docker-compose.yml ;; pacod-gw|pacod-broker) app=deploy/docker-compose.yml ;;
 		pacod-ap) app=pacod-api/docker-compose.yml ;; *) app=docker-compose.yml ;; esac
 	if ! grep -q pacod-admin-net "../$r/$app" 2>/dev/null; then
 		bad "../$r ($branch) is from before pacod-admin-net: check out its branch pacod-admin-net, or one based on it (pacod-id: rebase pacod-vanga onto it)"
