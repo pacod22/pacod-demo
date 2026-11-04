@@ -30,6 +30,12 @@ products already ship, pointed at the demo's files instead of a checkout's.
    holding broker.provider there, whose token lets the bridge announce that organisation's
    offerings. The bridge's file (/state/broker/gw-broker.yaml) lists those organisations; a
    template is offered once its editor switches "Offer on pacod-broker" on.
+7. pacod-broker for the app and the CMS: an account holding broker.consumer and broker.provider
+   at the platform for pacod-ap (BROKER_AP_TOKEN: its agents' search tool, the console's Broker
+   page, the agents and the MCP server it announces); one holding broker.consumer for the CMS
+   studio (CMS_BROKER_TOKEN: reputation and the broker's models on the installation screen);
+   and broker.provisioner at the platform for the studio's provisioner account, with which the
+   studio makes each organisation's own provider account when it first offers a website.
 
 Every step keeps what still works, so a second run changes nothing. All results go to
 /state/bootstrap.env; nothing secret is printed. scripts/render-env.sh then hands them to the
@@ -317,6 +323,35 @@ def broker(api: gw.Api) -> None:
         if mint(var, f"{BROKER_ACCOUNT} {org['name']}", [("broker.provider", f"organisation:{org['id']}")]):
             orgs.append((org["name"], var))
     write_bridge_file(orgs)
+
+    # pacod-ap is one installation: one account announces its agents and searches the broker.
+    mint("BROKER_AP_TOKEN", "pacod-demo ap broker",
+         [("broker.consumer", "platform"), ("broker.provider", "platform")])
+    # The CMS studio reads with this one; each organisation announces with its own, which the
+    # studio's provisioner makes (pacod-cms's BrokerProviders), hence broker.provisioner.
+    mint("CMS_BROKER_TOKEN", "pacod-demo cms broker", [("broker.consumer", "platform")])
+    provisioner = gw.read_env(OUT).get("PACOD_ID_PROVISIONER_ACCOUNT")
+    if provisioner:
+        session = session or IdSession(ident["PID_BOOTSTRAP_ADMIN_EMAIL"], ident["PID_BOOTSTRAP_ADMIN_PASSWORD"])
+        bind_platform_role(session, provisioner, "broker.provisioner")
+
+
+def bind_platform_role(session: IdSession, principal: str, role: str) -> None:
+    """`role` at the platform for `principal`, kept when it is there; waits a moment for the
+    role's product to push its catalogue, as a stack that has just started may not have."""
+    for _ in range(30):
+        binding = {"principal": principal, "role": role, "scope": "platform"}
+        status, answer = session.call("POST", "/ui-api/v1/admin/bindings", binding)
+        code = (answer.get("error", {}).get("details", {}).get("code") if isinstance(answer, dict) else None)
+        if status == 201:
+            say(f"broker: gave the studio's provisioner {role}")
+            return
+        if code == "binding_exists":
+            return
+        if code != "unknown_role":
+            gw.fail(f"pacod-id refused the studio's provisioner {role} ({status}): {gw.short(answer)}")
+        time.sleep(2)
+    say(f"broker: {role} is not there yet at pacod-id; make bootstrap adds it")
 
 
 def write_bridge_file(orgs: list[tuple[str, str]]) -> None:

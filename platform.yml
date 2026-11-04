@@ -95,6 +95,7 @@ services:
       PROMETHEUS_SITE: ${PROMETHEUS_SITE}
       ID_SITE: ${ID_SITE}
       AP_SITE: ${AP_SITE}
+      AP_AGENT_API_SITE: ${AP_AGENT_API_SITE}
       GW_CONSOLE_SITE: ${GW_CONSOLE_SITE}
       GW_API_SITE: ${GW_API_SITE}
       GW_SITE_TLS: ""
@@ -121,6 +122,7 @@ services:
       # The request logs (docs/LOGGING.md): the demo's own sites and pacod-ap's (AP_SITE_OPTIONS
       # imports config/Caddyfile's demo_access_log), and each product fragment's format.
       AP_SITE_OPTIONS: ${AP_SITE_OPTIONS}
+      AP_AGENT_API_SITE_OPTIONS: ${AP_AGENT_API_SITE_OPTIONS}
       DEMO_CADDY_LOG_FORMAT: ${DEMO_CADDY_LOG_FORMAT}
       ID_CADDY_LOG_FORMAT: ${ID_CADDY_LOG_FORMAT}
       PGW_CADDY_LOG_FORMAT: ${PGW_CADDY_LOG_FORMAT}
@@ -133,6 +135,8 @@ services:
       - ../pacod-id/platform/caddy/id.caddy:/etc/caddy/sites/id.caddy:ro
       - ../pacod-gw/platform/caddy/gw.caddy:/etc/caddy/sites/gw.caddy:ro
       - ../pacod-ap/platform/caddy/ap.caddy:/etc/caddy/sites/ap.caddy:ro
+      # pacod-ap's agents as an API (/v1, /mcp), for pacod-broker's consumers.
+      - ../pacod-ap/platform/caddy/ap-agents.caddy:/etc/caddy/sites/ap-agents.caddy:ro
       - ../pacod-cms/platform/caddy/cms.caddy:/etc/caddy/sites/cms.caddy:ro
       - ../pacod-kb/platform/caddy/kb.caddy:/etc/caddy/sites/kb.caddy:ro
       - ../pacod-benchmark/platform/caddy/bench.caddy:/etc/caddy/sites/bench.caddy:ro
@@ -160,6 +164,7 @@ services:
           - bench.${DEMO_DOMAIN}
           - broker.${DEMO_DOMAIN}
           - broker-api.${DEMO_DOMAIN}
+          - agents.${DEMO_DOMAIN}
           - grafana.${DEMO_DOMAIN}
           - mail.${DEMO_DOMAIN}
           - prometheus.${DEMO_DOMAIN}

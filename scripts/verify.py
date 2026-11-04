@@ -461,7 +461,7 @@ def bench() -> None:
 
 # ---- 9. The broker: pacod-gw as provider, source and witness -------------------------------------
 def broker() -> None:
-    section("broker (pacod-broker, and pacod-gw's bridge to it)")
+    section("broker (pacod-broker: pacod-gw's bridge, pacod-ap and the CMS)")
     made = gw.read_env(Path("/state/bootstrap.env"))
     missing = [v for v in ("GWB_GW_TOKEN", "GWB_CONSUMER_TOKEN", "PGW_BROKER_TOKEN") if not made.get(v)]
     if missing:
@@ -486,6 +486,17 @@ def broker() -> None:
         reachable = isinstance(body, dict) and body.get("reachable") is True
         report(status == 200 and reachable, "the gateway's core reaches the broker",
                f"{status} {gw.short(body) if not reachable else ''}")
+    # pacod-ap and the CMS studio search it with their own tokens.
+    for var in ("BROKER_AP_TOKEN", "CMS_BROKER_TOKEN"):
+        if not made.get(var):
+            report(False, f"{var} searches the broker", "missing (make bootstrap)")
+            continue
+        auth = {"Authorization": f"Bearer {made[var]}"}
+        status, _, _ = http("POST", "http://pacod-broker:8060/v1/discover", body={"limit": 1}, headers=auth)
+        report(status == 200, f"{var} searches the broker", str(status))
+    # The agents' site answers, and only with a token.
+    status, _, _ = http("POST", E["AP_AGENTS_ORIGIN"] + "/mcp", body={"jsonrpc": "2.0", "id": 1, "method": "ping"})
+    report(status == 401, "the agents' MCP (agents.) refuses a call without a token", str(status))
 
 
 def main() -> None:
