@@ -57,6 +57,10 @@ need PGW_UI_SESSION_SECRET hex 32
 need BENCH_UI_SESSION_SECRET hex 32
 # pacod-benchmark: the key the tokens of gateways added in its UI are sealed under.
 need BENCH_KEK b64 32
+# pacod-broker: its service client and its console's client and session.
+need BROKER_ID_SERVICE_SECRET hex 32
+need BROKER_UI_CLIENT_SECRET hex 32
+need BROKER_UI_SESSION_SECRET hex 32
 
 # pacod-gw.
 need PGW_KEK b64 32

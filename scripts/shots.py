@@ -35,6 +35,7 @@ SHOTS = [
     ("cms-space", E["CMS_SPACE_ORIGIN"] + "/"),
     ("kb", E["KB_ORIGIN"] + "/kb"),
     ("bench", E["BENCH_ORIGIN"] + "/"),
+    ("broker", E["BROKER_ORIGIN"] + "/catalogue"),
 ]
 
 

@@ -1,6 +1,6 @@
 # The pacod logging convention
 
-All pacod repos (`pacod-id`, `pacod-gw`, `pacod-ap`, `pacod-cms`, `pacod-kb`, `pacod-benchmark`)
+All pacod repos (`pacod-id`, `pacod-gw`, `pacod-ap`, `pacod-cms`, `pacod-kb`, `pacod-benchmark`, `pacod-broker`)
 log the same way, so one reader (a terminal, `docker compose logs`, or a log collector such as Loki or Elastic) handles
 every product without a parser per product. The full stack (`pacod-demo`) sets the level and
 format of all of them with two values (section 7).
@@ -53,11 +53,13 @@ everywhere:
 | pacod-gw | gw-load-agent | `RUST_LOG` | `LOAD_AGENT_LOG_FORMAT` (compose: from `PGW_LOG_FORMAT`) | json |
 | pacod-gw | gw-analytics | `RUST_LOG` | `ANALYTICS_LOG_FORMAT` (compose: from `PGW_LOG_FORMAT`) | json |
 | pacod-gw | gw-tester | `TESTER_LOG_LEVEL` | `TESTER_LOG_FORMAT` (compose: from `PGW_LOG_FORMAT`) | json |
+| pacod-gw | gw-broker | `RUST_LOG` | `GWB_LOG_FORMAT` (compose: from `PGW_LOG_FORMAT`) | json |
 | pacod-ap | ap-api, ap-admin-api, workers, ap-mcp, ap-ingestion*, pacod-embeddings | `APP_LOG_LEVEL` | `APP_LOG_FORMAT` | json (text while `APP_ENV=development` and the format is unset) |
 | pacod-ap | ap-frontend | `LOG_LEVEL` | `LOG_FORMAT` | json (text while `NODE_ENV` is not `production` and the format is unset) |
 | pacod-cms | cms-site, cms-studio | `APP_LOG_LEVEL` | `APP_LOG_FORMAT` | json |
 | pacod-kb | kb-pipeline, kb-ui | `LOG_LEVEL` | `LOG_FORMAT` | json |
 | pacod-benchmark | bench-api | `RUST_LOG` | `BENCH_LOG_FORMAT` | json |
+| pacod-broker | pacod-broker | `RUST_LOG` | `BROKER_LOG_FORMAT` | json |
 
 A repo's development compose files may set `text` for the developer's terminal; its production
 files keep `json`. Every compose file passes the variables through with today's value as the

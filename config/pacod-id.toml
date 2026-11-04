@@ -1,12 +1,13 @@
 # pacod-id for the full stack: one realm, `pacod`, for every product. One sign-in covers the app
 # (pacod-ap), the gateway console (pacod-gw), the CMS studio (pacod-cms), the knowledge base
-# (pacod-kb) and the benchmarks (pacod-benchmark). The clients are the products' own, as their
+# (pacod-kb), the benchmarks (pacod-benchmark) and the broker (pacod-broker). The clients are the products' own, as their
 # standalone configurations define them:
 #
 #   pacod-ap   pacod-api/docker/pacod-id/pacod-id.toml   pacod-web, pacod-api, the gateway's three
 #   pacod-cms  docker/pacod-id/pacod-id.toml             pacod-cms-studio, pacod-cms-service
 #   pacod-kb   docker/pacod-id/pacod-id.toml             pacod-kb-ui, pacod-kb-service
 #   pacod-benchmark  docker/pacod-id/pacod-id.toml       pacod-bench-ui, pacod-bench-service
+#   pacod-broker     docs/integration.md                 pacod-broker-ui, pacod-broker-service
 #
 # ${NAME} is filled in from pacod-id's environment (.state/env/id.env, made by
 # scripts/render-env.sh from demo.env); secrets come from the variable each `secret_env` names.
@@ -25,7 +26,7 @@ terms_url = "${AP_ORIGIN}/terms"
 terms_version = "2026-10-16"
 privacy_url = "${AP_ORIGIN}/privacy"
 # Who creates, disables and resets accounts besides id.admin.
-accounts_managed_by = ["pacod.admin", "pacod.superuser", "gw.platform_admin", "cms.platform_admin", "kb.admin", "bench.admin"]
+accounts_managed_by = ["pacod.admin", "pacod.superuser", "gw.platform_admin", "cms.platform_admin", "kb.admin", "bench.admin", "broker.admin"]
 
 # ---- pacod-ap -------------------------------------------------------------------------------
 
@@ -156,3 +157,27 @@ kind = "service"
 product = "bench"
 secret_env = "BENCH_ID_SERVICE_SECRET"
 audience = "pacod-bench"
+
+# ---- pacod-broker -----------------------------------------------------------------------------
+
+# The console's sign-in.
+[[client]]
+id = "pacod-broker-ui"
+realm = "pacod"
+kind = "confidential"
+secret_env = "BROKER_UI_CLIENT_SECRET"
+redirect_uris = ["${BROKER_ORIGIN}/auth/callback"]
+post_logout_redirect_uris = ["${BROKER_ORIGIN}/"]
+initiate_login_uri = "${BROKER_ORIGIN}/auth/login"
+audience = "pacod-broker"
+
+# The broker as a service: its manifest (authz/broker.yaml), the feed, and token introspection.
+# Providers and consumers call it with their own pacod-id tokens; pacod-gw's bridge and core with
+# service accounts the bootstrap makes (scripts/bootstrap.py).
+[[client]]
+id = "pacod-broker-service"
+realm = "pacod"
+kind = "service"
+product = "broker"
+secret_env = "BROKER_ID_SERVICE_SECRET"
+audience = "pacod-broker"

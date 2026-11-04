@@ -109,6 +109,8 @@ services:
       CMS_SPACE_HOST: ${CMS_SPACE_HOST}
       KB_SITE: ${KB_SITE}
       BENCH_SITE: ${BENCH_SITE}
+      BROKER_SITE: ${BROKER_SITE}
+      BROKER_API_SITE: ${BROKER_API_SITE}
       # The home page's notice of the nightly reset (the Makefile's scheduler).
       DEMO_RESET: ${DEMO_RESET}
       DEMO_RESET_TIME: ${DEMO_RESET_TIME}
@@ -125,6 +127,7 @@ services:
       CMS_CADDY_LOG_FORMAT: ${CMS_CADDY_LOG_FORMAT}
       KB_CADDY_LOG_FORMAT: ${KB_CADDY_LOG_FORMAT}
       BENCH_CADDY_LOG_FORMAT: ${BENCH_CADDY_LOG_FORMAT}
+      BROKER_CADDY_LOG_FORMAT: ${BROKER_CADDY_LOG_FORMAT}
     volumes: !override
       - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
       - ../pacod-id/platform/caddy/id.caddy:/etc/caddy/sites/id.caddy:ro
@@ -133,6 +136,7 @@ services:
       - ../pacod-cms/platform/caddy/cms.caddy:/etc/caddy/sites/cms.caddy:ro
       - ../pacod-kb/platform/caddy/kb.caddy:/etc/caddy/sites/kb.caddy:ro
       - ../pacod-benchmark/platform/caddy/bench.caddy:/etc/caddy/sites/bench.caddy:ro
+      - ../pacod-broker/platform/caddy/broker.caddy:/etc/caddy/sites/broker.caddy:ro
       - ./home:/srv/home:ro
       # The certificate and key that demo.env names (DEMO_TLS_CERT, DEMO_TLS_KEY).
       - ./certs:/etc/caddy/tls:ro
@@ -154,6 +158,8 @@ services:
           - ${CMS_SPACE_HOST}
           - kb.${DEMO_DOMAIN}
           - bench.${DEMO_DOMAIN}
+          - broker.${DEMO_DOMAIN}
+          - broker-api.${DEMO_DOMAIN}
           - grafana.${DEMO_DOMAIN}
           - mail.${DEMO_DOMAIN}
           - prometheus.${DEMO_DOMAIN}
@@ -184,6 +190,9 @@ services:
       - ../pacod-gw/platform/prometheus/gw.yml:/etc/prometheus/scrape.d/gw.yml:ro
       - ../pacod-ap/platform/prometheus/ap.yml:/etc/prometheus/scrape.d/ap.yml:ro
       - ../pacod-benchmark/platform/prometheus/bench.yml:/etc/prometheus/scrape.d/bench.yml:ro
+      - ../pacod-broker/platform/prometheus/broker.yml:/etc/prometheus/scrape.d/broker.yml:ro
+      - ../pacod-gw/platform/prometheus/gw-broker.yml:/etc/prometheus/scrape.d/gw-broker.yml:ro
+      - ../pacod-broker/deploy/prometheus/rules:/etc/prometheus/rules/broker:ro
       - pacod-prometheus-data:/prometheus
 
   pacod-alertmanager:
@@ -213,6 +222,7 @@ services:
       - ./config/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/demo.yml:ro
       - ../pacod-gw/deploy/grafana/dashboards:/etc/grafana/dashboards/gw:ro
       - ../pacod-ap/monitoring/grafana/dashboards:/etc/grafana/dashboards/ap:ro
+      - ../pacod-broker/deploy/grafana/dashboards:/etc/grafana/dashboards/broker:ro
       - pacod-grafana-data:/var/lib/grafana
 
 networks:
