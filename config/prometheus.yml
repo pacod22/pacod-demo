@@ -16,6 +16,7 @@ global:
 rule_files:
   - /etc/prometheus/rules/gw/*.yml
   - /etc/prometheus/rules/ap/*.rules.yml
+  - /etc/prometheus/rules/broker/*.yml
 
 alerting:
   alertmanagers:

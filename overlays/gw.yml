@@ -54,6 +54,11 @@ services:
       PGW_ID_CLIENT_SECRET: ${PGW_ID_CLIENT_SECRET}
       # Installs the response cache on for every workspace, on a new database only.
       PGW_CACHE_DEFAULT_MODE: enforce
+      # pacod-broker (overlays/broker.yml): models it lists at the gateway's providers become
+      # discovery proposals, templates may take pool members from it, and /mcp searches it. The
+      # token (broker.consumer) comes from the bootstrap; until then the core leaves the broker be.
+      PGW_BROKER_URL: http://pacod-broker:8060
+      PGW_BROKER_TOKEN: ${PGW_BROKER_TOKEN:-}
     depends_on:
       pacod-id:
         condition: service_healthy
@@ -95,3 +100,24 @@ services:
 
   gw-load-mock:
     ports: !reset []
+
+  # The bridge to pacod-broker (pacod-gw's profile broker): it announces the templates offered on
+  # the broker, keeps their live state, and reports how calls went. Its tokens and its file come
+  # from the bootstrap (scripts/bootstrap.py), so scripts/render-env.sh turns the profile on only
+  # once they are there. It runs as the user who runs make, who owns the file and the token files
+  # (0600) under .state/broker.
+  gw-broker:
+    ports: !reset []
+    user: "${DEMO_UID}:${DEMO_GID}"
+    volumes: !override
+      - ${DEMO_STATE}/broker:/etc/gw-broker:ro
+    environment:
+      RUST_LOG: ${DEMO_LOG_LEVEL}
+      GWB_LOG_FORMAT: ${DEMO_LOG_FORMAT}
+      GWB_GW_TOKEN: ${GWB_GW_TOKEN:-}
+      GWB_CONSUMER_TOKEN: ${GWB_CONSUMER_TOKEN:-}
+      GWB_PUBLIC_URL: ${GW_API_ORIGIN}
+      GWB_OBTAIN_URL: ${GW_CONSOLE_ORIGIN}
+    depends_on:
+      pacod-broker:
+        condition: service_healthy

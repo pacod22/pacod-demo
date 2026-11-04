@@ -80,7 +80,7 @@ done
 	exit 1
 }
 # The studio sits beside the other products under DEMO_DOMAIN: never on one of their subdomains.
-for taken in id app chat console gw kb bench grafana mail prometheus; do
+for taken in id app chat console gw kb bench broker broker-api grafana mail prometheus; do
 	[ "$studio" != "$taken" ] || {
 		echo "render-env: DEMO_STUDIO_SUBDOMAIN=$studio is already the edge's ($taken.$DEMO_DOMAIN): choose another" >&2
 		exit 1
@@ -123,7 +123,7 @@ fi
 # created at these hosts unchecked.
 if [ "$sd" = "$d" ]; then
 	for h in "$cms" "$minimal" "$space"; do
-		for taken in "$studio" id app chat console gw kb bench grafana mail prometheus; do
+		for taken in "$studio" id app chat console gw kb bench broker broker-api grafana mail prometheus; do
 			[ "$h" != "$taken" ] || {
 				echo "render-env: the CMS website subdomain $h.$d is already the edge's ($taken):" \
 					"choose another DEMO_CMS_SUBDOMAIN, DEMO_CMS_MINIMAL_SUBDOMAIN or DEMO_CMS_SPACE_SUBDOMAIN" >&2
@@ -312,6 +312,7 @@ PGW_CADDY_LOG_FORMAT=$caddy_log_format
 CMS_CADDY_LOG_FORMAT=$caddy_log_format
 KB_CADDY_LOG_FORMAT=$caddy_log_format
 BENCH_CADDY_LOG_FORMAT=$caddy_log_format
+BROKER_CADDY_LOG_FORMAT=$caddy_log_format
 AP_SITE_OPTIONS='import demo_access_log'
 
 # The public addresses, all through pacod-caddy.
@@ -325,6 +326,8 @@ CMS_MINIMAL_ORIGIN=$(site_url "$minimal")
 CMS_SPACE_ORIGIN=$(site_url "$space")
 KB_ORIGIN=$(url kb)
 BENCH_ORIGIN=$(url bench)
+BROKER_ORIGIN=$(url broker)
+BROKER_API_ORIGIN=$(url broker-api)
 GRAFANA_ORIGIN=$(url grafana)
 MAIL_ORIGIN=$(url mail)
 PROMETHEUS_ORIGIN=$(url prometheus)
@@ -351,6 +354,8 @@ DEMO_UID=$(id -u)
 DEMO_GID=$(id -g)
 KB_SITE=$(url kb)
 BENCH_SITE=$(url bench)
+BROKER_SITE=$(url broker)
+BROKER_API_SITE=$(url broker-api)
 
 # The demo's own sites (config/Caddyfile). Quoted where a value has spaces or \$: compose reads
 # single-quoted values literally, and the Makefile sources this file.
@@ -377,7 +382,7 @@ EOF
 cat > "$state/env/id.env" <<EOF
 PID_BOOTSTRAP_ADMIN_EMAIL=$DEMO_ADMIN_EMAIL
 PID_BOOTSTRAP_ADMIN_REALM=pacod
-PID_BOOTSTRAP_ADMIN_ROLES=id.admin,pacod.superuser,pacod.admin,gw.platform_admin,cms.platform_admin,kb.admin,bench.admin
+PID_BOOTSTRAP_ADMIN_ROLES=id.admin,pacod.superuser,pacod.admin,gw.platform_admin,cms.platform_admin,kb.admin,bench.admin,broker.admin
 PID_EMAIL_FROM_ADDRESS=id@$d
 PID_EMAIL_FROM_NAME=pacod (demo)
 PID_LOG=$log_level,sqlx=warn
@@ -394,6 +399,7 @@ GW_CONSOLE_ORIGIN=$(url console)
 CMS_STUDIO_ORIGIN=$(url "$studio")
 KB_ORIGIN=$(url kb)
 BENCH_ORIGIN=$(url bench)
+BROKER_ORIGIN=$(url broker)
 PACOD_WEB_CLIENT_SECRET=$PACOD_WEB_CLIENT_SECRET
 PACOD_API_CLIENT_SECRET=$PACOD_API_CLIENT_SECRET
 PGW_UI_CLIENT_SECRET=$PGW_UI_CLIENT_SECRET
@@ -405,6 +411,8 @@ KB_ID_UI_SECRET=$KB_ID_UI_SECRET
 KB_ID_SERVICE_SECRET=$KB_ID_SERVICE_SECRET
 BENCH_ID_UI_SECRET=$BENCH_ID_UI_SECRET
 BENCH_ID_SERVICE_SECRET=$BENCH_ID_SERVICE_SECRET
+BROKER_ID_SERVICE_SECRET=$BROKER_ID_SERVICE_SECRET
+BROKER_UI_CLIENT_SECRET=$BROKER_UI_CLIENT_SECRET
 EOF
 
 # ---- pacod-gw ---------------------------------------------------------------------------------
@@ -461,6 +469,12 @@ EOF
 # scripts/bootstrap.py): bench-api refuses a gateway without one. make up recreates it then.
 cat > "$state/env/bench.env" <<EOF
 BENCH_GW_ADMIN_URL=${BENCH_GW_ADMIN_TOKEN:+http://pacod-gw-admin:8081}
+EOF
+
+# ---- pacod-broker -----------------------------------------------------------------------------
+# The broker's own settings are in overlays/broker.yml; its log format is the demo's.
+cat > "$state/env/broker.env" <<EOF
+BROKER_LOG_FORMAT=$log_format
 EOF
 
 # ---- pacod-ap ---------------------------------------------------------------------------------
@@ -525,6 +539,10 @@ EOF
 # Compose profiles: the app's frontend always; its CPU ingestion on request.
 profiles=ui
 case ",$DEMO_PROFILES," in *,ingestion,*) profiles="$profiles,cpu" ;; esac
+# pacod-gw's bridge to pacod-broker, once the bootstrap has made its tokens and its file.
+if [ -n "${GWB_GW_TOKEN:-}" ] && [ -f "$state/broker/gw-broker.yaml" ]; then
+	profiles="$profiles,broker"
+fi
 printf '%s\n' "$profiles" > "$state/profiles"
 
 # ---- the bootstrap (pacod-ap's scripts, run by scripts/bootstrap.py) ----------------------------

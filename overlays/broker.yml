@@ -1,0 +1,30 @@
+# Adapts pacod-broker's app file (../pacod-broker/deploy/docker-compose.yml) to the full stack:
+# the broker and its console sign in through the shared pacod-id (BROKER_AUTH=oidc), take the
+# demo's secrets and log level, and publish no ports (the edge serves the API and the console).
+#
+# The admin API stays on pacod-admin-net under the alias pacod-broker-admin (docs/NETWORK.md):
+# the console and pacod-gw's core reach it there, nothing else does.
+services:
+  pacod-broker:
+    ports: !reset []
+    environment:
+      RUST_LOG: ${DEMO_LOG_LEVEL}
+      BROKER_LOG_FORMAT: ${DEMO_LOG_FORMAT}
+      BROKER_AUTH: oidc
+      BROKER_ID_ISSUER: ${PACOD_ID_ISSUER}
+      BROKER_ID_CLIENT_ID: pacod-broker-service
+      BROKER_ID_CLIENT_SECRET: ${BROKER_ID_SERVICE_SECRET}
+      BROKER_ID_AUDIENCE: pacod-broker
+    depends_on:
+      pacod-id:
+        condition: service_healthy
+
+  broker-console:
+    ports: !reset []
+    environment:
+      BROKER_UI_AUTH: oidc
+      BROKER_ID_ISSUER: ${PACOD_ID_ISSUER}
+      BROKER_UI_CLIENT_SECRET: ${BROKER_UI_CLIENT_SECRET}
+      BROKER_UI_SESSION_SECRET: ${BROKER_UI_SESSION_SECRET}
+      BROKER_CONSOLE_URL: ${BROKER_ORIGIN}
+      GRAFANA_URL: ${GRAFANA_ORIGIN:-}

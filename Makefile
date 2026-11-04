@@ -19,7 +19,7 @@ TOOLS := pacod-demo-tools:dev
 SHOTS := pacod-demo-shots:dev
 # Docker's CLI, make and tar: the nightly reset's scheduler and the baseline's archiver.
 RESET := pacod-demo-reset:dev
-# The compose project: the six repositories' own compose files plus the shared layer.
+# The compose project: the seven repositories' own compose files plus the shared layer.
 COMPOSE = COMPOSE_PROFILES=$$(cat .state/profiles 2>/dev/null || echo ui) docker compose \
 	--project-directory . -f compose.yml
 # The tools image on pacod-net, and on pacod-admin-net for the gateway's management API, with
@@ -30,7 +30,7 @@ TOOLS_RUN = docker run --rm --network pacod-net --network pacod-admin-net --user
 	--env-file .state/env/stack.env $(TOOLS)
 # The app's services that read the bootstrap's credentials (and the products' that read theirs).
 RECREATE := ap-api ap-admin-api ap-improvement-loop-worker ap-newsletter-worker cms-studio kb-pipeline \
-	bench-api
+	bench-api pacod-gw
 # A one-off CMS studio container running one of its commands (pacod-cms's STUDIO_CLI): no web
 # server, bootstrap, pacod-id or jobs.
 CMS_CLI = $(COMPOSE) run --rm --no-deps -T cms-studio --spring.main.web-application-type=none \
@@ -62,7 +62,7 @@ help:
 	@echo "  make urls      the addresses and the admin's sign-in"
 	@echo "  make status    the containers and their health"
 	@echo "  make logs S=<service>   follow one service's log (all without S)"
-	@echo "  make build     rebuild the images from the six checkouts"
+	@echo "  make build     rebuild the images from the seven checkouts"
 	@echo "  make bootstrap redo the cross-product credentials (after adding a provider key)"
 	@echo "  make baseline  keep the data as it is now as the state every reset returns to"
 	@echo "  make cms-space create the CMS's Starward website (magazine design) on a stack without it"
@@ -152,6 +152,8 @@ bootstrap: network tools render
 	@$(TOOLS_RUN) python3 -I /work/scripts/bootstrap.py
 	@sh scripts/render-env.sh
 	$(COMPOSE) up -d --no-deps $(WAIT) $(RECREATE)
+	@# pacod-gw's bridge to pacod-broker: its profile is on once the bootstrap made its tokens.
+	@if grep -q broker .state/profiles; then $(COMPOSE) up -d --no-deps $(WAIT) gw-broker; fi
 
 # The app's own seed (pacod-ap's bootstrap-local): tables, the starter agent's facts, dev users,
 # and its corpus when its ingestion runs. Each step is idempotent.
@@ -330,6 +332,8 @@ urls: render
 	echo "  CMS space website           $$CMS_SPACE_ORIGIN"; \
 	echo "  Knowledge base (pacod-kb)   $$KB_ORIGIN"; \
 	echo "  Benchmark (pacod-benchmark) $$BENCH_ORIGIN"; \
+	echo "  Broker (pacod-broker)       $$BROKER_ORIGIN"; \
+	echo "  Broker API (discovery)      $$BROKER_API_ORIGIN/v1"; \
 	echo "  Identity (pacod-id)         $$PACOD_ID_ISSUER/admin"; \
 	echo "  Grafana                     $$GRAFANA_ORIGIN"; \
 	echo "  Mail (every mail sent)      $$MAIL_ORIGIN"; \
@@ -358,7 +362,7 @@ hosts:
 	sd=$${DEMO_SITE_DOMAIN:-$$DEMO_DOMAIN}; \
 	echo "# pacod demo: add to /etc/hosts for browsers that do not resolve *.$$DEMO_DOMAIN and *.$$sd"; \
 	if [ "$$DEMO_DOMAIN" != localhost ]; then echo "127.0.0.1 $$DEMO_DOMAIN"; fi; \
-	for h in id app chat console gw $${DEMO_STUDIO_SUBDOMAIN:-studio} kb bench grafana mail prometheus; do \
+	for h in id app chat console gw $${DEMO_STUDIO_SUBDOMAIN:-studio} kb bench broker broker-api grafana mail prometheus; do \
 		echo "127.0.0.1 $$h.$$DEMO_DOMAIN"; done; \
 	for h in $${DEMO_CMS_SUBDOMAIN:-cms} $${DEMO_CMS_MINIMAL_SUBDOMAIN:-minimal} $${DEMO_CMS_SPACE_SUBDOMAIN:-space}; do \
 		echo "127.0.0.1 $$h.$$sd"; done

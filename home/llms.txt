@@ -5,7 +5,7 @@
 {{- $public := eq (env "DEMO_PUBLIC") "true" }}{{ $reset := eq (env "DEMO_RESET") "true" -}}
 # pacod demo
 
-> pacod, open source: a high-performance AI gateway (pacod-gw), an AI-assisted CMS (pacod-cms) and an easy agent builder (pacod-ap), working as one platform with one sign-in (pacod-id), beside a RAG knowledge base (pacod-kb) and the gateway's benchmarks (pacod-benchmark). This demo runs all of them together on one machine.
+> pacod, open source: a high-performance AI gateway (pacod-gw), an AI-assisted CMS (pacod-cms) and an easy agent builder (pacod-ap), working as one platform with one sign-in (pacod-id), beside a RAG knowledge base (pacod-kb), the gateway's benchmarks (pacod-benchmark) and a discovery broker (pacod-broker). This demo runs all of them together on one machine.
 
 Every person signs in through pacod-id; every model call goes through pacod-gw, so the products on top never hold a provider's key. Each product is a complete product with its own repository; here they share one network, one database server and one sign-in.{{if $reset}} The demo is reset every night at {{env "DEMO_RESET_TIME"}} {{env "DEMO_RESET_TIMEZONE"}}: every change made to it is undone.{{end}}
 
@@ -21,6 +21,7 @@ Every person signs in through pacod-id; every model call goes through pacod-gw, 
 - [pacod-id, identity administration]({{$s}}://id.{{$d}}{{$p}}/admin): one sign-in for people and machines; an OpenID Connect provider with accounts, organisations and role bindings ([discovery]({{$s}}://id.{{$d}}{{$p}}/.well-known/openid-configuration)).
 - [pacod-kb, the knowledge base]({{$s}}://kb.{{$d}}{{$p}}/kb): ingests files and web pages, converts them to Markdown and indexes them for hybrid semantic and keyword search.
 - [pacod-benchmark]({{$s}}://bench.{{$d}}{{$p}}/): measures pacod-gw and other gateways over a matrix of settings; reports are published to the gateway console.
+- [pacod-broker]({{$s}}://broker.{{$d}}{{$p}}/): a catalogue of models, MCP servers, agents and compute with prices, availability and reputation; its public API is at {{$s}}://broker-api.{{$d}}{{$p}}/v1 (POST /v1/discover, and MCP at /mcp).
 
 ## Platform
 
@@ -31,5 +32,5 @@ Every person signs in through pacod-id; every model call goes through pacod-gw, 
 ## Optional
 
 - [pacod on ai.pacod.io](https://ai.pacod.io): the overview of every project.
-- [pacod22 on GitHub](https://github.com/pacod22): the repositories (pacod-gw, pacod-cms, pacod-ap, pacod-id, pacod-kb, pacod-benchmark).
+- [pacod22 on GitHub](https://github.com/pacod22): the repositories (pacod-gw, pacod-cms, pacod-ap, pacod-id, pacod-kb, pacod-benchmark, pacod-broker).
 - [pacod-demo](https://github.com/pacod22/pacod-demo): how this demo is put together and run.

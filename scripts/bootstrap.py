@@ -23,6 +23,14 @@ products already ship, pointed at the demo's files instead of a checkout's.
    (/internal/v1/ai-models): CMS_AI_MODEL as the default and CMS_AI_MODEL_<FEATURE> per feature,
    a blank one clearing that feature's choice, so demo.env decides; PACOD_AI_MODEL stays too.
 
+6. pacod-broker for the gateway (pacod-gw's gw-broker and core, docs/pacod-gw.md of
+   pacod-broker): a gateway token with broker_bridge (GWB_GW_TOKEN); pacod-id service accounts
+   holding broker.consumer and broker.witness for the bridge (GWB_CONSUMER_TOKEN) and
+   broker.consumer for the core (PGW_BROKER_TOKEN); and one account per gateway organisation
+   holding broker.provider there, whose token lets the bridge announce that organisation's
+   offerings. The bridge's file (/state/broker/gw-broker.yaml) lists those organisations; a
+   template is offered once its editor switches "Offer on pacod-broker" on.
+
 Every step keeps what still works, so a second run changes nothing. All results go to
 /state/bootstrap.env; nothing secret is printed. scripts/render-env.sh then hands them to the
 services, and `make up` recreates the ones whose settings changed.
@@ -75,6 +83,9 @@ DATA_URL = "http://pacod-gw:8080"
 # The studio's internal API, on pacod-net (Caddy does not route /internal/).
 CMS_STUDIO = "http://cms-studio:7443"
 CMS_ADMIN_NAME = "pacod-demo cms admin"
+# pacod-broker's public API, on pacod-net; its accounts at pacod-id carry this prefix.
+BROKER_URL = "http://pacod-broker:8060"
+BROKER_ACCOUNT = "pacod-demo gw-broker"
 # The studio's AI features (pacod-cms's AiFeature), each set by CMS_AI_MODEL_<NAME>.
 CMS_AI_FEATURES = ("translate", "pdf", "assist", "vision", "design")
 
@@ -225,6 +236,113 @@ def admin_roles() -> None:
         say(f"admin: {role} waits for its product's catalogue at pacod-id; make bootstrap adds it")
 
 
+def service_token(session: IdSession, name: str, bindings: list[tuple[str, str]]) -> str | None:
+    """A new token of the pacod-id service account `name` (made when missing), after binding it
+    the roles given as (role, scope). Every older token of the account is revoked. None while a
+    role waits for its product's catalogue: a token is never made before its roles are bound."""
+    status, listed = session.call("GET", "/ui-api/v1/admin/service-accounts")
+    if status != 200:
+        gw.fail(f"pacod-id did not list its service accounts ({status}): {gw.short(listed)}")
+    account = next((a for a in listed.get("service_accounts", [])
+                    if a.get("name") == name and a.get("status") != "disabled"), None)
+    if account is None:
+        status, account = session.call("POST", "/ui-api/v1/admin/service-accounts", {"name": name})
+        if status != 201:
+            gw.fail(f"pacod-id did not make the account {name!r} ({status}): {gw.short(account)}")
+    for role, scope in bindings:
+        for _ in range(30):
+            binding = {"principal": account["id"], "role": role, "scope": scope}
+            status, answer = session.call("POST", "/ui-api/v1/admin/bindings", binding)
+            code = (answer.get("error", {}).get("details", {}).get("code") if isinstance(answer, dict) else None)
+            if status == 201 or code == "binding_exists":
+                break
+            if code not in ("unknown_role", "scope_unknown"):
+                gw.fail(f"pacod-id refused {name!r} {role} at {scope} ({status}): {gw.short(answer)}")
+            time.sleep(2)
+        else:
+            say(f"broker: {role} at {scope} is not there yet at pacod-id; make bootstrap adds it")
+            return None
+    status, made = session.call("POST", f"/ui-api/v1/admin/service-accounts/{account['id']}/tokens", {})
+    if status != 201 or not isinstance(made, dict) or not made.get("token"):
+        gw.fail(f"pacod-id did not give {name!r} a token ({status})")
+    status, tokens = session.call("GET", f"/ui-api/v1/admin/service-accounts/{account['id']}/tokens")
+    for t in (tokens or {}).get("tokens", []) if status == 200 else []:
+        if t.get("id") != made.get("id") and t.get("status") != "revoked":
+            session.call("DELETE", f"/ui-api/v1/admin/service-tokens/{t['id']}")
+    return made["token"]
+
+
+def broker_takes(token: str | None) -> bool:
+    """Whether pacod-broker still takes a stored token: 401 means it does not. The broker being
+    down is not the token's fault, so that keeps it too."""
+    if not token:
+        return False
+    status, _, _ = gw.request("GET", f"{BROKER_URL}/v1/reputation/me", token=token)
+    return status != 401
+
+
+def broker(api: gw.Api) -> None:
+    have = gw.read_env(OUT)
+    # The bridge reads the platform as broker_bridge (calls with tickets included), no more.
+    token = have.get("GWB_GW_TOKEN")
+    if not token or gw.refused(gw.probe("GET", f"{api.base}/orgs", token)):
+        token = gw.make_admin_token(api, "pacod-gw-broker", "broker_bridge", {"type": "platform"})
+        gw.write_env(OUT, {"GWB_GW_TOKEN": token})
+        say("broker: made GWB_GW_TOKEN (broker_bridge)")
+
+    ident = gw.read_env(gw.ID_ENV)
+    session = None
+
+    def mint(var: str, name: str, bindings: list[tuple[str, str]]) -> bool:
+        nonlocal session
+        if broker_takes(gw.read_env(OUT).get(var)):
+            return True
+        session = session or IdSession(ident["PID_BOOTSTRAP_ADMIN_EMAIL"], ident["PID_BOOTSTRAP_ADMIN_PASSWORD"])
+        made = service_token(session, name, bindings)
+        if made is None:
+            return False
+        gw.write_env(OUT, {var: made})
+        say(f"broker: made {var} ({', '.join(r for r, _ in bindings)})")
+        return True
+
+    mint("GWB_CONSUMER_TOKEN", f"{BROKER_ACCOUNT} bridge",
+         [("broker.consumer", "platform"), ("broker.witness", "platform")])
+    mint("PGW_BROKER_TOKEN", f"{BROKER_ACCOUNT} core", [("broker.consumer", "platform")])
+
+    # One provider account per organisation of the gateway, so that each announces as itself
+    # and its own members' calls never count towards its reputation (docs/reputation.md).
+    orgs = []
+    for org in api.items("/orgs"):
+        var = "GWB_ORG_TOKEN_" + "".join(c if c.isalnum() else "_" for c in org["name"]).upper()
+        if mint(var, f"{BROKER_ACCOUNT} {org['name']}", [("broker.provider", f"organisation:{org['id']}")]):
+            orgs.append((org["name"], var))
+    write_bridge_file(orgs)
+
+
+def write_bridge_file(orgs: list[tuple[str, str]]) -> None:
+    """The bridge's file and the organisations' token files, mounted into gw-broker
+    (overlays/gw.yml), which runs as the user who runs make and so reads them at 0600."""
+    folder = STATE / "broker"
+    folder.mkdir(mode=0o700, exist_ok=True)
+    tokens = gw.read_env(OUT)
+    lines = [
+        "# Written by scripts/bootstrap.py at every run: edit the offerings in the console",
+        "# (a template's \"Offer on pacod-broker\"), not here.",
+        "organisations:",
+    ]
+    for name, var in orgs:
+        path = folder / f"{var.lower()}.token"
+        path.write_text(tokens[var] + "\n", encoding="utf-8")
+        path.chmod(0o600)
+        lines += [f"  - organisation: {json.dumps(name)}", f"    token_file: /etc/gw-broker/{path.name}"]
+    if not orgs:
+        lines[-1] = "organisations: []"
+    target = folder / "gw-broker.yaml"
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    target.chmod(0o600)
+    say(f"broker: the bridge offers for {len(orgs)} organisation(s)")
+
+
 def cms_call(method: str, path: str, token: str, body=None):
     """(status, parsed body) of the studio's internal API; status 0 when it cannot be reached --
     gw.request would end the bootstrap, and a studio that is not up must cost this step only."""
@@ -359,6 +477,7 @@ def main() -> None:
     cms_provisioner()
     admin_roles()
     cms_gateway_key()
+    broker(api)
     say(f"done; credentials in .state/{OUT.name}")
 
 

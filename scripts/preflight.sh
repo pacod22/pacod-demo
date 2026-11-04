@@ -47,9 +47,9 @@ else
 	ok "free disk ${free_gib} GiB"
 fi
 
-for r in pacod-id pacod-gw pacod-ap pacod-cms pacod-kb pacod-benchmark; do
+for r in pacod-id pacod-gw pacod-ap pacod-cms pacod-kb pacod-benchmark pacod-broker; do
 	if [ ! -d "../$r" ]; then
-		bad "../$r is missing: the demo builds from the six sibling checkouts"
+		bad "../$r is missing: the demo builds from the seven sibling checkouts"
 		continue
 	fi
 	if [ ! -d "../$r/platform" ]; then
@@ -72,7 +72,7 @@ done
 # The shared names (pacod-*) exist once per host: another pacod stack must be stopped first. The
 # demo's nightly reset runs outside its compose project (Makefile: scheduler).
 others=$(docker ps --format '{{.Names}} {{.Label "com.docker.compose.project"}}' |
-	awk '$2 != "pacod-demo" && $1 != "pacod-demo-reset" && ($1 ~ /^(pacod|gw|ap|cms|kb|bench|id)-/) {print $1 " (" $2 ")"}')
+	awk '$2 != "pacod-demo" && $1 != "pacod-demo-reset" && ($1 ~ /^(pacod|gw|ap|cms|kb|bench|broker|id)-/) {print $1 " (" $2 ")"}')
 if [ -n "$others" ]; then
 	bad "other pacod containers are running; stop their stacks first: $(echo "$others" | tr '\n' ' ')"
 else

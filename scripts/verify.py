@@ -100,6 +100,8 @@ def edge() -> None:
     check("cms demo website", E["CMS_DEMO_ORIGIN"] + "/", want=(200,))
     check("knowledge base", E["KB_ORIGIN"] + "/kb/healthz", contains='"identity"')
     check("benchmark", E["BENCH_ORIGIN"] + "/", want=(302, 303))
+    check("broker console", E["BROKER_ORIGIN"] + "/", want=(302, 303))
+    check("broker API", E["BROKER_API_ORIGIN"] + "/healthz")
     if not PUBLIC:
         check("grafana", E["GRAFANA_ORIGIN"] + "/api/health")
     if PUBLIC:
@@ -146,6 +148,8 @@ def health() -> None:
         ("kb-pipeline", "http://kb-pipeline:8000/health"),
         # Ready only with a current copy of its roles from pacod-id.
         ("bench-api ready (pacod-admin-net)", "http://bench-api-internal:8190/api/v1/readyz"),
+        ("pacod-broker ready", "http://pacod-broker:8060/readyz"),
+        ("pacod-broker admin (pacod-admin-net)", "http://pacod-broker-admin:8061/healthz"),
         ("pacod-qdrant", "http://pacod-qdrant:6333/readyz"),
         ("pacod-prometheus", "http://pacod-prometheus:9090/-/ready"),
         ("pacod-alertmanager", "http://pacod-alertmanager:9093/-/ready"),
@@ -164,20 +168,23 @@ def health() -> None:
     targets = body["data"]["activeTargets"]
     ingestion = "ingestion" in E.get("DEMO_PROFILES", "")
     down = [t for t in targets if t["health"] != "up"]
-    hard = [t for t in down if not (t["labels"]["job"] == "ingestion" and not ingestion)]
+    bridge = "broker" in Path("/state/profiles").read_text() if Path("/state/profiles").exists() else False
+    hard = [t for t in down if not (t["labels"]["job"] == "ingestion" and not ingestion)
+            and not (t["labels"]["job"] == "pacod-gw-broker" and not bridge)]
     jobs = sorted({t["labels"]["job"] for t in targets})
     report(not hard, f"prometheus: {len(targets) - len(down)}/{len(targets)} targets up ({len(jobs)} jobs)",
            ", ".join(f"{t['labels']['job']}={t['lastError'][:60]}" for t in hard)
            + ("" if ingestion else "  (the app's ingestion is off: DEMO_PROFILES)"))
 
-    # One monitoring stack for every product: the gateway's and the app's rules and dashboards.
+    # One monitoring stack for every product: the gateway's, the app's and the broker's rules and
+    # dashboards.
     status, body, _ = http("GET", "http://pacod-prometheus:9090/api/v1/rules")
     files = {g["file"].split("/rules/")[-1].split("/")[0] for g in body["data"]["groups"]} if status == 200 else set()
     groups = len(body["data"]["groups"]) if status == 200 else 0
-    report({"gw", "ap"} <= files, "prometheus: rules of the gateway and the app loaded", f"{groups} groups from {sorted(files)}")
+    report({"gw", "ap", "broker"} <= files, "prometheus: rules of the gateway, the app and the broker loaded", f"{groups} groups from {sorted(files)}")
     status, body, _ = http("GET", "http://pacod-grafana:3000/api/search?type=dash-db")
     folders = {d.get("folderUid") for d in body} if status == 200 and isinstance(body, list) else set()
-    report({"pacod-gw", "pacod"} <= folders, "grafana: dashboards of the gateway and the app",
+    report({"pacod-gw", "pacod", "pacod-broker"} <= folders, "grafana: dashboards of the gateway, the app and the broker",
            f"{len(body) if isinstance(body, list) else 0} dashboards in {sorted(f for f in folders if f)}")
 
 
@@ -219,6 +226,7 @@ def sso() -> None:
          "/mgmt/oauth2/code/pacod-id"),
         ("knowledge base (pacod-kb)", E["KB_ORIGIN"], "/kb/login", "/kb/auth/callback"),
         ("benchmark (pacod-benchmark)", E["BENCH_ORIGIN"], "/auth/login", "/auth/callback"),
+        ("broker console (pacod-broker)", E["BROKER_ORIGIN"], "/auth/login", "/auth/callback"),
     ]
     for name, origin, login, callback in products:
         jar = Jar()
@@ -451,8 +459,37 @@ def bench() -> None:
     report(bool(named), "bench-api is given the gateway to manage", named or "BENCH_GW_ADMIN_URL is empty")
 
 
+# ---- 9. The broker: pacod-gw as provider, source and witness -------------------------------------
+def broker() -> None:
+    section("broker (pacod-broker, and pacod-gw's bridge to it)")
+    made = gw.read_env(Path("/state/bootstrap.env"))
+    missing = [v for v in ("GWB_GW_TOKEN", "GWB_CONSUMER_TOKEN", "PGW_BROKER_TOKEN") if not made.get(v)]
+    if missing:
+        report(False, "the bridge's and the core's tokens", f"{', '.join(missing)} missing (make bootstrap)")
+        return
+    # The bridge reads the platform as broker_bridge, which also reads the calls with tickets.
+    auth = {"Authorization": f"Bearer {made['GWB_GW_TOKEN']}"}
+    status, _, _ = http("GET", "http://pacod-gw-admin:8081/api/v1/broker/calls", headers=auth)
+    report(status == 200, "GWB_GW_TOKEN reads the calls with tickets (broker_bridge)", str(status))
+    # The bridge's and the core's pacod-id tokens search the broker.
+    for var in ("GWB_CONSUMER_TOKEN", "PGW_BROKER_TOKEN"):
+        auth = {"Authorization": f"Bearer {made[var]}"}
+        status, _, _ = http("POST", "http://pacod-broker:8060/v1/discover", body={"limit": 1}, headers=auth)
+        report(status == 200, f"{var} searches the broker", str(status))
+    status, _, _ = http("GET", "http://gw-broker:8097/readyz")
+    report(status == 200, "gw-broker ready", str(status))
+    # The core sees the broker (its Broker page in the console reads the same).
+    admin = made.get("BENCH_GW_ADMIN_TOKEN")
+    if admin:
+        status, body, _ = http("GET", "http://pacod-gw-admin:8081/api/v1/broker/status",
+                               headers={"Authorization": f"Bearer {admin}"})
+        reachable = isinstance(body, dict) and body.get("reachable") is True
+        report(status == 200 and reachable, "the gateway's core reaches the broker",
+               f"{status} {gw.short(body) if not reachable else ''}")
+
+
 def main() -> None:
-    only = sys.argv[1:] or ["edge", "health", "sso", "gateway", "app", "kb", "cms", "bench"]
+    only = sys.argv[1:] or ["edge", "health", "sso", "gateway", "app", "kb", "cms", "bench", "broker"]
     for name in only:
         globals()[name]()
     print()

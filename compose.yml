@@ -1,4 +1,4 @@
-# The pacod full stack on one machine: one compose project made of the six repositories' own
+# The pacod full stack on one machine: one compose project made of the seven repositories' own
 # compose files (their "app files"), a small overlay per repository, and the shared layer
 # (platform.yml). Run it with `make up`, not by hand: the Makefile generates the secrets and the
 # env files under .state/ that every include below reads.
@@ -56,6 +56,13 @@ include:
       - ../pacod-benchmark/docker-compose.yml
       - overlays/bench.yml
     env_file: [.state/env/stack.env, .state/env/bench.env]
+
+  # pacod-broker: the discovery broker (API, admin API, console). No database: its state is a
+  # volume. pacod-gw's bridge to it, gw-broker, is in overlays/gw.yml.
+  - path:
+      - ../pacod-broker/deploy/docker-compose.yml
+      - overlays/broker.yml
+    env_file: [.state/env/stack.env, .state/env/broker.env]
 
   # The shared layer: one PostgreSQL, Qdrant, mail sink, edge and monitoring stack.
   - path: platform.yml
