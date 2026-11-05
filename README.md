@@ -332,6 +332,7 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
 | Symptom | What to do |
 |---|---|
 | `preflight: other pacod containers are running` | A repository's own stack holds the shared names (`pacod-postgres`, ...). Stop it (`make down` or `make compose-down` there). |
+| `preflight: ../pacod-<repo>/... is missing`, or `is a directory where ../pacod-<repo> has a file`; or `pacod-caddy` exits at start with nothing on the terminal | A sibling checkout is older than the demo, so a file the demo mounts from it is not there. Compose then mounts an empty directory in its place, and the service reading it fails, saying why only in its log (`docker logs pacod-caddy`: "Could not import ...: is a directory"). Remove the directory the preflight names (`sudo rmdir`, as Docker made it), `git -C ../pacod-<repo> pull`, then `make up`. |
 | `up` stops with a container unhealthy | `make status`, then `make logs S=<service>`. A first start downloads models; `make up` again continues. |
 | A model download reports "Not enough free disk space", or PostgreSQL fails to write | Docker's own disk is full (Docker Desktop: Settings, Resources, disk usage limit). `docker system df` shows what uses it; `docker builder prune` frees the build cache without touching images or data. |
 | Containers exit with code 137 | Docker ran out of memory: give it more (Docker Desktop: Settings, Resources) or set `EMBEDDINGS_BACKEND=hash`. |
