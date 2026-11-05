@@ -118,7 +118,7 @@ The variable names stay what each product already calls them; only their default
 | pacod-id, internal | `http://pacod-id-internal:8071` (on `pacod-admin-net`) | ap `ID_INTERNAL_URL`, gw `PGW_ID_INTERNAL_URL`, cms and kb `PACOD_ID_INTERNAL_URL`, bench `BENCH_ID_INTERNAL_URL` |
 | pacod-gw, data plane | `http://pacod-gw:8080` | ap `GATEWAY_URL`, cms and kb `PACOD_GW_URL` |
 | pacod-gw, management | `http://pacod-gw-admin:8081` (on `pacod-admin-net`) | ap `GATEWAY_ADMIN_URL`, gw `GATEWAY_API_URL`, `PGW_CORE_ADMIN_URL`, `GWB_GW_URL`, bench `BENCH_GW_ADMIN_URL` |
-| pacod-broker, public | `http://pacod-broker:8060` | gw `PGW_BROKER_URL`, `GWB_BROKER_URL` |
+| pacod-broker, public | `http://pacod-broker:8060` | gw `PGW_BROKER_URL`, `GWB_BROKER_URL`; ap `BROKER_URL`; cms `PACOD_BROKER_URL` |
 | pacod-broker, admin | `http://pacod-broker-admin:8061` (on `pacod-admin-net`) | broker `BROKER_CONSOLE_BROKERS` |
 | PostgreSQL | `pacod-postgres:5432` | ap via `ap-pgbouncer`, kb `KB_DATABASE_HOST`, gw `DATABASE_URL`, id `PID_DATABASE_URL`, bench `DATABASE_URL` |
 | Qdrant | `http://pacod-qdrant:6333` | ap and kb `QDRANT_URL` |
@@ -172,7 +172,7 @@ root. Its standalone copies consume them, and so does the full stack: nothing is
 |---|---|
 | pacod-id | `ID_SITE` |
 | pacod-gw | `GW_CONSOLE_SITE`, `GW_API_SITE` |
-| pacod-ap | `AP_SITE` |
+| pacod-ap | `AP_SITE`; `AP_AGENT_API_SITE` (its agents' API, `ap-agents.caddy`, mounted by pacod-demo) |
 | pacod-cms | `CMS_STUDIO_SITE`, `CMS_PUBLIC_SITE` (catch-all) |
 | pacod-kb | `KB_SITE` |
 | pacod-benchmark | `BENCH_SITE` |

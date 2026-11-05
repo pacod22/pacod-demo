@@ -80,7 +80,7 @@ done
 	exit 1
 }
 # The studio sits beside the other products under DEMO_DOMAIN: never on one of their subdomains.
-for taken in id app chat console gw kb bench broker broker-api grafana mail prometheus; do
+for taken in id app chat console gw kb bench broker broker-api agents grafana mail prometheus; do
 	[ "$studio" != "$taken" ] || {
 		echo "render-env: DEMO_STUDIO_SUBDOMAIN=$studio is already the edge's ($taken.$DEMO_DOMAIN): choose another" >&2
 		exit 1
@@ -123,7 +123,7 @@ fi
 # created at these hosts unchecked.
 if [ "$sd" = "$d" ]; then
 	for h in "$cms" "$minimal" "$space"; do
-		for taken in "$studio" id app chat console gw kb bench broker broker-api grafana mail prometheus; do
+		for taken in "$studio" id app chat console gw kb bench broker broker-api agents grafana mail prometheus; do
 			[ "$h" != "$taken" ] || {
 				echo "render-env: the CMS website subdomain $h.$d is already the edge's ($taken):" \
 					"choose another DEMO_CMS_SUBDOMAIN, DEMO_CMS_MINIMAL_SUBDOMAIN or DEMO_CMS_SPACE_SUBDOMAIN" >&2
@@ -304,7 +304,7 @@ DEMO_LOG_DIR=$log_dir
 # Every product's log level and format (docs/LOGGING.md); the product files below spell them out.
 DEMO_LOG_LEVEL=$log_level
 DEMO_LOG_FORMAT=$log_format
-# The edge's request logs: the demo's sites (config/Caddyfile), pacod-ap's site (AP_SITE_OPTIONS,
+# The edge's request logs: the demo's sites (config/Caddyfile), pacod-ap's sites (AP_SITE_OPTIONS, AP_AGENT_API_SITE_OPTIONS,
 # the demo's access log), and the products' fragments, each with its own variable.
 DEMO_CADDY_LOG_FORMAT=$caddy_log_format
 ID_CADDY_LOG_FORMAT=$caddy_log_format
@@ -314,6 +314,7 @@ KB_CADDY_LOG_FORMAT=$caddy_log_format
 BENCH_CADDY_LOG_FORMAT=$caddy_log_format
 BROKER_CADDY_LOG_FORMAT=$caddy_log_format
 AP_SITE_OPTIONS='import demo_access_log'
+AP_AGENT_API_SITE_OPTIONS='import demo_access_log'
 
 # The public addresses, all through pacod-caddy.
 PACOD_ID_ISSUER=$(url id)
@@ -328,6 +329,8 @@ KB_ORIGIN=$(url kb)
 BENCH_ORIGIN=$(url bench)
 BROKER_ORIGIN=$(url broker)
 BROKER_API_ORIGIN=$(url broker-api)
+# pacod-ap's agents as an API for pacod-broker's consumers: /v1 and /mcp (pacod-ap's ap-agents.caddy).
+AP_AGENTS_ORIGIN=$(url agents)
 GRAFANA_ORIGIN=$(url grafana)
 MAIL_ORIGIN=$(url mail)
 PROMETHEUS_ORIGIN=$(url prometheus)
@@ -356,6 +359,7 @@ KB_SITE=$(url kb)
 BENCH_SITE=$(url bench)
 BROKER_SITE=$(url broker)
 BROKER_API_SITE=$(url broker-api)
+AP_AGENT_API_SITE=$(url agents)
 
 # The demo's own sites (config/Caddyfile). Quoted where a value has spaces or \$: compose reads
 # single-quoted values literally, and the Makefile sources this file.
@@ -444,6 +448,11 @@ APP_LOG_FORMAT=$log_format
 PACOD_GW_API_KEY=${CMS_GW_KEY:-}
 PACOD_AI_MODEL=$CMS_AI_MODEL
 PACOD_ID_PROVISIONER_TOKEN=${PACOD_ID_PROVISIONER_TOKEN:-}
+# pacod-broker: reputation and the broker's models on the installation screen (CMS_BROKER_TOKEN,
+# broker.consumer), and the websites offered as datasets, each organisation as its own provider
+# (the provisioner above holds broker.provisioner for that; scripts/bootstrap.py).
+PACOD_BROKER_URL=http://pacod-broker:8060
+PACOD_BROKER_TOKEN=${CMS_BROKER_TOKEN:-}
 EOF
 
 # ---- pacod-kb ---------------------------------------------------------------------------------
@@ -494,6 +503,14 @@ FRONTEND_LOG_LEVEL=$log_level
 FRONTEND_LOG_FORMAT=$log_format
 APP_LOG_LEVEL=$log_level_upper
 APP_LOG_FORMAT=$log_format
+# pacod-broker, on compose's side because pacod-ap's compose file names these for ap-api and
+# ap-admin-api: the agents' search tool and the console's Broker page read it, ap-admin-api
+# announces the offered agents and the MCP server at the agents' site. The token comes from the
+# bootstrap (broker.consumer and broker.provider); until then nothing is announced or searched.
+BROKER_URL=http://pacod-broker:8060
+BROKER_TOKEN=${BROKER_AP_TOKEN:-}
+BROKER_AGENT_URL=$(url agents)
+BROKER_MCP_URL=$(url agents)/mcp
 EOF
 
 # The containers' side: the app's own .env.example as the base (every setting it documents, with

@@ -57,6 +57,7 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 | https://bench.demo.pacod.io | benchmarks of the gateway (pacod-benchmark): suites, runs, comparisons; published reports show in the gateway console |
 | https://broker.demo.pacod.io | the discovery broker's console (pacod-broker): resources, providers, reputation, leases |
 | https://broker-api.demo.pacod.io/v1 | the broker's public API: `POST /v1/discover`, announcements, MCP at `/mcp` |
+| https://agents.demo.pacod.io/v1 | pacod-ap's offered agents as an OpenAI-compatible API (an agent's slug is the model), and their reference facts over MCP at `/mcp`; both need a pacod-id token, and pacod-broker lists them |
 | https://id.demo.pacod.io/admin | identity administration (pacod-id) |
 | https://grafana.demo.pacod.io | dashboards of every product |
 | https://mail.demo.pacod.io | every mail the stack sends (invitations, confirmations) |
@@ -306,7 +307,12 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
   pacod-broker: a `broker_bridge` token for the bridge (`gw-broker`), pacod-id service accounts
   for the bridge (`broker.consumer`, `broker.witness`) and the core (`broker.consumer`), and one
   per gateway organisation holding `broker.provider` there, so that each organisation announces
-  its offered templates as itself. The bridge's profile is on once they exist. Last, it gives the admin every role of
+  its offered templates as itself. The bridge's profile is on once they exist. pacod-ap gets one
+  account holding `broker.consumer` and `broker.provider` at the platform (`BROKER_AP_TOKEN`:
+  its agents' search tool, the console's Broker page, and the agents and the MCP server it
+  announces at `agents.`), the CMS studio one holding `broker.consumer` (`CMS_BROKER_TOKEN`), and
+  the studio's provisioner `broker.provisioner`, with which the studio makes each organisation's
+  own provider account when that organisation first offers a website. Last, it gives the admin every role of
   `PID_BOOTSTRAP_ADMIN_ROLES` its account lacks, and takes none away: pacod-id gives them only to
   the account it creates, so an account older than a product never got that product's role.
   Then it hands the CMS studio its gateway key live: a `PUT` to cms-studio's
