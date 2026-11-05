@@ -73,22 +73,36 @@ done
 # checkout older than the demo lacks some of them, and compose then makes an empty directory in
 # the place of each: the service reading it fails, and says so only in its own log (pacod-caddy:
 # "Could not import /etc/caddy/sites/ap-agents.caddy: is a directory").
+# What to do about a source the sibling lacks on disk, from what its git says: restore a file the
+# checkout has (git counts it deleted, so no pull brings it back), or pull a checkout that is older,
+# named by branch and commit, since a pull that does not move it has a reason `git status` gives.
+mount_fix() { # mount_fix REPO PATH-IN-REPO
+	if git -C "../$1" cat-file -e "HEAD:$2" 2>/dev/null; then
+		echo "../$1 has it, but not on disk, so a pull will not bring it back: git -C ../$1 checkout -- $2"
+	elif at=$(git -C "../$1" log -1 --format=%h 2>/dev/null); then
+		branch=$(git -C "../$1" branch --show-current 2>/dev/null || true)
+		echo "../$1 (${branch:-detached} at $at) is older than the demo: git -C ../$1 pull; if that says up to date, git -C ../$1 status says why (another branch, local changes)"
+	else
+		echo "../$1 is older than the demo (git -C ../$1 pull)"
+	fi
+}
 mount_problems=0
 for src in $(sed -n 's#^[[:space:]]*-[[:space:]]*\(\.\./pacod-[a-z-]*/[^:]*\):.*#\1#p' platform.yml overlays/*.yml | sort -u); do
 	repo=$(printf '%s\n' "$src" | cut -d/ -f2)
 	[ -d "../$repo" ] || continue # reported above
+	rel=${src#../$repo/}
 	case ${src##*/} in
 	*.*) # a file
 		if [ -d "$src" ]; then
-			bad "$src is a directory where ../$repo has a file: a start with an older checkout left it behind; remove it (sudo rmdir $src), then git -C ../$repo pull"
+			bad "$src is a directory where ../$repo has a file, left by a start that found the file missing: remove it (sudo rmdir $src); then $(mount_fix "$repo" "$rel")"
 			mount_problems=1
 		elif [ ! -f "$src" ]; then
-			bad "$src is missing: ../$repo is older than the demo (git -C ../$repo pull)"
+			bad "$src is missing: $(mount_fix "$repo" "$rel")"
 			mount_problems=1
 		fi ;;
 	*) # a folder, which an earlier failed start may also have left empty
 		if [ ! -d "$src" ] || [ -z "$(ls -A "$src" 2>/dev/null)" ]; then
-			bad "$src is missing or empty: ../$repo is older than the demo (git -C ../$repo pull)"
+			bad "$src is missing or empty: $(mount_fix "$repo" "$rel")"
 			mount_problems=1
 		fi ;;
 	esac
