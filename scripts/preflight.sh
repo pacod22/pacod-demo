@@ -1,8 +1,8 @@
 #!/bin/sh
-# Checks the machine before `make up`: Docker and Compose, memory and disk, the six sibling
-# repositories (on the shared-network layout), that no other pacod stack holds the shared
-# container names, the admin password's length, the HTTPS certificate and the demo's ports. Prints what it finds; exits 1 on a
-# blocking problem.
+# Checks the machine before `make up`: Docker and Compose, memory and disk, the seven sibling
+# repositories (on the shared-network layout) and every file the demo mounts from them, that no
+# other pacod stack holds the shared container names, the admin password's length, the HTTPS
+# certificate and the demo's ports. Prints what it finds; exits 1 on a blocking problem.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -68,6 +68,32 @@ for r in pacod-id pacod-gw pacod-ap pacod-cms pacod-kb pacod-benchmark pacod-bro
 	fi
 	ok "../$r ($branch)"
 done
+
+# Every file and folder the demo mounts from a sibling checkout (platform.yml, overlays/). A
+# checkout older than the demo lacks some of them, and compose then makes an empty directory in
+# the place of each: the service reading it fails, and says so only in its own log (pacod-caddy:
+# "Could not import /etc/caddy/sites/ap-agents.caddy: is a directory").
+mount_problems=0
+for src in $(sed -n 's#^[[:space:]]*-[[:space:]]*\(\.\./pacod-[a-z-]*/[^:]*\):.*#\1#p' platform.yml overlays/*.yml | sort -u); do
+	repo=$(printf '%s\n' "$src" | cut -d/ -f2)
+	[ -d "../$repo" ] || continue # reported above
+	case ${src##*/} in
+	*.*) # a file
+		if [ -d "$src" ]; then
+			bad "$src is a directory where ../$repo has a file: a start with an older checkout left it behind; remove it (sudo rmdir $src), then git -C ../$repo pull"
+			mount_problems=1
+		elif [ ! -f "$src" ]; then
+			bad "$src is missing: ../$repo is older than the demo (git -C ../$repo pull)"
+			mount_problems=1
+		fi ;;
+	*) # a folder, which an earlier failed start may also have left empty
+		if [ ! -d "$src" ] || [ -z "$(ls -A "$src" 2>/dev/null)" ]; then
+			bad "$src is missing or empty: ../$repo is older than the demo (git -C ../$repo pull)"
+			mount_problems=1
+		fi ;;
+	esac
+done
+[ "$mount_problems" = 1 ] || ok "every file the demo mounts from the sibling checkouts is there"
 
 # The shared names (pacod-*) exist once per host: another pacod stack must be stopped first. The
 # demo's nightly reset runs outside its compose project (Makefile: scheduler).
