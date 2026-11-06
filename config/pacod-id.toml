@@ -8,6 +8,7 @@
 #   pacod-kb   docker/pacod-id/pacod-id.toml             pacod-kb-ui, pacod-kb-service
 #   pacod-benchmark  docker/pacod-id/pacod-id.toml       pacod-bench-ui, pacod-bench-service
 #   pacod-broker     docs/integration.md                 pacod-broker-ui, pacod-broker-service
+#   pacod-aggregator docs/integration.md                 pacod-agg-ui, pacod-agg-service
 #
 # ${NAME} is filled in from pacod-id's environment (.state/env/id.env, made by
 # scripts/render-env.sh from demo.env); secrets come from the variable each `secret_env` names.
@@ -26,7 +27,7 @@ terms_url = "${AP_ORIGIN}/terms"
 terms_version = "2026-10-16"
 privacy_url = "${AP_ORIGIN}/privacy"
 # Who creates, disables and resets accounts besides id.admin.
-accounts_managed_by = ["pacod.admin", "pacod.superuser", "gw.platform_admin", "cms.platform_admin", "kb.admin", "bench.admin", "broker.admin"]
+accounts_managed_by = ["pacod.admin", "pacod.superuser", "gw.platform_admin", "cms.platform_admin", "kb.admin", "bench.admin", "broker.admin", "agg.admin"]
 
 # ---- pacod-ap -------------------------------------------------------------------------------
 
@@ -181,3 +182,26 @@ kind = "service"
 product = "broker"
 secret_env = "BROKER_ID_SERVICE_SECRET"
 audience = "pacod-broker"
+
+# ---- pacod-aggregator -------------------------------------------------------------------------
+
+# The console's sign-in.
+[[client]]
+id = "pacod-agg-ui"
+realm = "pacod"
+kind = "confidential"
+secret_env = "AGG_UI_CLIENT_SECRET"
+redirect_uris = ["${AGG_CONSOLE_URL}/auth/callback"]
+post_logout_redirect_uris = ["${AGG_CONSOLE_URL}/"]
+initiate_login_uri = "${AGG_CONSOLE_URL}/auth/login"
+audience = "pacod-aggregator"
+
+# The aggregator as a service: its manifest (authz/agg.yaml) and the feed. pacod-gw's core reads
+# the catalogue with a service account the bootstrap makes (scripts/bootstrap.py).
+[[client]]
+id = "pacod-agg-service"
+realm = "pacod"
+kind = "service"
+product = "agg"
+secret_env = "AGG_ID_CLIENT_SECRET"
+audience = "pacod-aggregator"

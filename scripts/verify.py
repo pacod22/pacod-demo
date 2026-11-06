@@ -102,6 +102,9 @@ def edge() -> None:
     check("benchmark", E["BENCH_ORIGIN"] + "/", want=(302, 303))
     check("broker console", E["BROKER_ORIGIN"] + "/", want=(302, 303))
     check("broker API", E["BROKER_API_ORIGIN"] + "/healthz")
+    check("aggregator console", E["AGG_CONSOLE_URL"] + "/", want=(302, 303))
+    check("aggregator API", E["AGG_API_ORIGIN"] + "/healthz")
+    check("aggregator's admin API is not at the edge", E["AGG_API_ORIGIN"] + "/api/v1/status", want=(404,))
     if not PUBLIC:
         check("grafana", E["GRAFANA_ORIGIN"] + "/api/health")
     if PUBLIC:
@@ -150,6 +153,10 @@ def health() -> None:
         ("bench-api ready (pacod-admin-net)", "http://bench-api-internal:8190/api/v1/readyz"),
         ("pacod-broker ready", "http://pacod-broker:8060/readyz"),
         ("pacod-broker admin (pacod-admin-net)", "http://pacod-broker-admin:8061/healthz"),
+        # Ready only with a current copy of its roles from pacod-id.
+        ("pacod-aggregator ready", "http://pacod-aggregator:8150/readyz"),
+        ("pacod-aggregator admin (pacod-admin-net)", "http://pacod-aggregator-admin:8151/healthz"),
+        ("agg-scraper ready", "http://agg-scraper:8152/readyz"),
         ("pacod-qdrant", "http://pacod-qdrant:6333/readyz"),
         ("pacod-prometheus", "http://pacod-prometheus:9090/-/ready"),
         ("pacod-alertmanager", "http://pacod-alertmanager:9093/-/ready"),
@@ -181,10 +188,11 @@ def health() -> None:
     status, body, _ = http("GET", "http://pacod-prometheus:9090/api/v1/rules")
     files = {g["file"].split("/rules/")[-1].split("/")[0] for g in body["data"]["groups"]} if status == 200 else set()
     groups = len(body["data"]["groups"]) if status == 200 else 0
-    report({"gw", "ap", "broker"} <= files, "prometheus: rules of the gateway, the app and the broker loaded", f"{groups} groups from {sorted(files)}")
+    report({"gw", "ap", "broker", "agg"} <= files, "prometheus: rules of the gateway, the app, the broker and the aggregator loaded", f"{groups} groups from {sorted(files)}")
     status, body, _ = http("GET", "http://pacod-grafana:3000/api/search?type=dash-db")
     folders = {d.get("folderUid") for d in body} if status == 200 and isinstance(body, list) else set()
-    report({"pacod-gw", "pacod", "pacod-broker"} <= folders, "grafana: dashboards of the gateway, the app and the broker",
+    report({"pacod-gw", "pacod", "pacod-broker", "pacod-aggregator"} <= folders,
+           "grafana: dashboards of the gateway, the app, the broker and the aggregator",
            f"{len(body) if isinstance(body, list) else 0} dashboards in {sorted(f for f in folders if f)}")
 
 
@@ -227,6 +235,7 @@ def sso() -> None:
         ("knowledge base (pacod-kb)", E["KB_ORIGIN"], "/kb/login", "/kb/auth/callback"),
         ("benchmark (pacod-benchmark)", E["BENCH_ORIGIN"], "/auth/login", "/auth/callback"),
         ("broker console (pacod-broker)", E["BROKER_ORIGIN"], "/auth/login", "/auth/callback"),
+        ("aggregator console (pacod-aggregator)", E["AGG_CONSOLE_URL"], "/auth/login", "/auth/callback"),
     ]
     for name, origin, login, callback in products:
         jar = Jar()
@@ -499,8 +508,33 @@ def broker() -> None:
     report(status == 401, "the agents' MCP (agents.) refuses a call without a token", str(status))
 
 
+# ---- 10. The aggregator: pacod-gw's model data --------------------------------------------------
+def aggregator() -> None:
+    section("aggregator (pacod-aggregator: pacod-gw's model data)")
+    have = gw.read_env(Path("/state/bootstrap.env"))
+    status, _, _ = http("GET", "http://pacod-aggregator:8150/v1/catalog")
+    report(status == 401, "the catalogue refuses a call without a token", str(status))
+    token = have.get("PGW_AGGREGATOR_TOKEN")
+    if not token:
+        report(False, "PGW_AGGREGATOR_TOKEN reads the catalogue", "missing (make bootstrap)")
+        return
+    auth = {"Authorization": f"Bearer {token}"}
+    status, body, _ = http("GET", "http://pacod-aggregator:8150/v1/catalog", headers=auth)
+    models = len(body.get("models", [])) if isinstance(body, dict) else 0
+    report(status == 200, "PGW_AGGREGATOR_TOKEN reads the catalogue", f"{status}, {models} models")
+    admin = have.get("BENCH_GW_ADMIN_TOKEN")
+    if admin:
+        status, job, _ = http("GET", "http://pacod-gw-admin:8081/api/v1/price-job",
+                              headers={"Authorization": f"Bearer {admin}"})
+        link = job.get("sync", {}).get("aggregator", {}) if isinstance(job, dict) else {}
+        report(status == 200 and link.get("configured") and link.get("token"),
+               "the gateway's core has the aggregator's address and token", json.dumps(link))
+        report(status == 200 and job.get("source") == "pacod_aggregator" and not job.get("problems"),
+               "the gateway's sync of model data has no problem", str(job.get("problems")))
+
+
 def main() -> None:
-    only = sys.argv[1:] or ["edge", "health", "sso", "gateway", "app", "kb", "cms", "bench", "broker"]
+    only = sys.argv[1:] or ["edge", "health", "sso", "gateway", "app", "kb", "cms", "bench", "broker", "aggregator"]
     for name in only:
         globals()[name]()
     print()

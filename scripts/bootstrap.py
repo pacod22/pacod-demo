@@ -80,6 +80,7 @@ gw.SERVICES = [
     *gw.SERVICES,
     ("pacod-cms", "CMS_GW_KEY", 5.0),
     ("pacod-kb", "KB_GW_KEY", 5.0),
+    ("pacod-aggregator", "AGG_GW_KEY", 5.0),
 ]
 
 ISSUER = os.environ["PACOD_ID_ISSUER"]
@@ -89,6 +90,8 @@ DATA_URL = "http://pacod-gw:8080"
 # The studio's internal API, on pacod-net (Caddy does not route /internal/).
 CMS_STUDIO = "http://cms-studio:7443"
 CMS_ADMIN_NAME = "pacod-demo cms admin"
+# pacod-aggregator's public API, on pacod-net.
+AGG_URL = "http://pacod-aggregator:8150"
 # pacod-broker's public API, on pacod-net; its accounts at pacod-id carry this prefix.
 BROKER_URL = "http://pacod-broker:8060"
 BROKER_ACCOUNT = "pacod-demo gw-broker"
@@ -266,7 +269,7 @@ def service_token(session: IdSession, name: str, bindings: list[tuple[str, str]]
                 gw.fail(f"pacod-id refused {name!r} {role} at {scope} ({status}): {gw.short(answer)}")
             time.sleep(2)
         else:
-            say(f"broker: {role} at {scope} is not there yet at pacod-id; make bootstrap adds it")
+            say(f"{role} at {scope} is not there yet at pacod-id; make bootstrap adds it")
             return None
     status, made = session.call("POST", f"/ui-api/v1/admin/service-accounts/{account['id']}/tokens", {})
     if status != 201 or not isinstance(made, dict) or not made.get("token"):
@@ -334,6 +337,21 @@ def broker(api: gw.Api) -> None:
     if provisioner:
         session = session or IdSession(ident["PID_BOOTSTRAP_ADMIN_EMAIL"], ident["PID_BOOTSTRAP_ADMIN_PASSWORD"])
         bind_platform_role(session, provisioner, "broker.provisioner")
+
+
+def aggregator() -> None:
+    """The gateway's core reads the catalogue with a service account holding agg.consumer. A
+    stored token is kept unless the aggregator refuses it (401): one that is down keeps it too."""
+    var = "PGW_AGGREGATOR_TOKEN"
+    have = gw.read_env(OUT).get(var)
+    if have and gw.request("GET", f"{AGG_URL}/v1/vendors", token=have)[0] != 401:
+        return
+    ident = gw.read_env(gw.ID_ENV)
+    session = IdSession(ident["PID_BOOTSTRAP_ADMIN_EMAIL"], ident["PID_BOOTSTRAP_ADMIN_PASSWORD"])
+    made = service_token(session, "pacod-demo gw aggregator", [("agg.consumer", "platform")])
+    if made is not None:
+        gw.write_env(OUT, {var: made})
+        say(f"aggregator: made {var} (agg.consumer)")
 
 
 def bind_platform_role(session: IdSession, principal: str, role: str) -> None:
@@ -513,6 +531,7 @@ def main() -> None:
     admin_roles()
     cms_gateway_key()
     broker(api)
+    aggregator()
     say(f"done; credentials in .state/{OUT.name}")
 
 

@@ -30,7 +30,7 @@ TOOLS_RUN = docker run --rm --network pacod-net --network pacod-admin-net --user
 	--env-file .state/env/stack.env $(TOOLS)
 # The app's services that read the bootstrap's credentials (and the products' that read theirs).
 RECREATE := ap-api ap-admin-api ap-improvement-loop-worker ap-newsletter-worker cms-studio kb-pipeline \
-	bench-api pacod-gw
+	bench-api pacod-gw pacod-aggregator
 # A one-off CMS studio container running one of its commands (pacod-cms's STUDIO_CLI): no web
 # server, bootstrap, pacod-id or jobs.
 CMS_CLI = $(COMPOSE) run --rm --no-deps -T cms-studio --spring.main.web-application-type=none \
@@ -334,6 +334,8 @@ urls: render
 	echo "  Benchmark (pacod-benchmark) $$BENCH_ORIGIN"; \
 	echo "  Broker (pacod-broker)       $$BROKER_ORIGIN"; \
 	echo "  Broker API (discovery)      $$BROKER_API_ORIGIN/v1"; \
+	echo "  Aggregator (pacod-aggregator) $$AGG_CONSOLE_URL"; \
+	echo "  Aggregator API (catalogue)  $$AGG_API_ORIGIN/v1"; \
 	echo "  Agents API (pacod-ap)       $$AP_AGENTS_ORIGIN/v1, MCP at /mcp"; \
 	echo "  Identity (pacod-id)         $$PACOD_ID_ISSUER/admin"; \
 	echo "  Grafana                     $$GRAFANA_ORIGIN"; \
@@ -363,7 +365,7 @@ hosts:
 	sd=$${DEMO_SITE_DOMAIN:-$$DEMO_DOMAIN}; \
 	echo "# pacod demo: add to /etc/hosts for browsers that do not resolve *.$$DEMO_DOMAIN and *.$$sd"; \
 	if [ "$$DEMO_DOMAIN" != localhost ]; then echo "127.0.0.1 $$DEMO_DOMAIN"; fi; \
-	for h in id app chat console gw $${DEMO_STUDIO_SUBDOMAIN:-studio} kb bench broker broker-api agents grafana mail prometheus; do \
+	for h in id app chat console gw $${DEMO_STUDIO_SUBDOMAIN:-studio} kb bench broker broker-api agg agg-api agents grafana mail prometheus; do \
 		echo "127.0.0.1 $$h.$$DEMO_DOMAIN"; done; \
 	for h in $${DEMO_CMS_SUBDOMAIN:-cms} $${DEMO_CMS_MINIMAL_SUBDOMAIN:-minimal} $${DEMO_CMS_SPACE_SUBDOMAIN:-space}; do \
 		echo "127.0.0.1 $$h.$$sd"; done

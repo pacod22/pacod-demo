@@ -80,7 +80,7 @@ done
 	exit 1
 }
 # The studio sits beside the other products under DEMO_DOMAIN: never on one of their subdomains.
-for taken in id app chat console gw kb bench broker broker-api agents grafana mail prometheus; do
+for taken in id app chat console gw kb bench broker broker-api agg agg-api agents grafana mail prometheus; do
 	[ "$studio" != "$taken" ] || {
 		echo "render-env: DEMO_STUDIO_SUBDOMAIN=$studio is already the edge's ($taken.$DEMO_DOMAIN): choose another" >&2
 		exit 1
@@ -123,7 +123,7 @@ fi
 # created at these hosts unchecked.
 if [ "$sd" = "$d" ]; then
 	for h in "$cms" "$minimal" "$space"; do
-		for taken in "$studio" id app chat console gw kb bench broker broker-api agents grafana mail prometheus; do
+		for taken in "$studio" id app chat console gw kb bench broker broker-api agg agg-api agents grafana mail prometheus; do
 			[ "$h" != "$taken" ] || {
 				echo "render-env: the CMS website subdomain $h.$d is already the edge's ($taken):" \
 					"choose another DEMO_CMS_SUBDOMAIN, DEMO_CMS_MINIMAL_SUBDOMAIN or DEMO_CMS_SPACE_SUBDOMAIN" >&2
@@ -313,6 +313,7 @@ CMS_CADDY_LOG_FORMAT=$caddy_log_format
 KB_CADDY_LOG_FORMAT=$caddy_log_format
 BENCH_CADDY_LOG_FORMAT=$caddy_log_format
 BROKER_CADDY_LOG_FORMAT=$caddy_log_format
+AGG_CADDY_LOG_FORMAT=$caddy_log_format
 AP_SITE_OPTIONS='import demo_access_log'
 AP_AGENT_API_SITE_OPTIONS='import demo_access_log'
 
@@ -329,6 +330,8 @@ KB_ORIGIN=$(url kb)
 BENCH_ORIGIN=$(url bench)
 BROKER_ORIGIN=$(url broker)
 BROKER_API_ORIGIN=$(url broker-api)
+AGG_CONSOLE_URL=$(url agg)
+AGG_API_ORIGIN=$(url agg-api)
 # pacod-ap's agents as an API for pacod-broker's consumers: /v1 and /mcp (pacod-ap's ap-agents.caddy).
 AP_AGENTS_ORIGIN=$(url agents)
 GRAFANA_ORIGIN=$(url grafana)
@@ -359,6 +362,8 @@ KB_SITE=$(url kb)
 BENCH_SITE=$(url bench)
 BROKER_SITE=$(url broker)
 BROKER_API_SITE=$(url broker-api)
+AGG_SITE=$(url agg)
+AGG_API_SITE=$(url agg-api)
 AP_AGENT_API_SITE=$(url agents)
 
 # The demo's own sites (config/Caddyfile). Quoted where a value has spaces or \$: compose reads
@@ -386,7 +391,7 @@ EOF
 cat > "$state/env/id.env" <<EOF
 PID_BOOTSTRAP_ADMIN_EMAIL=$DEMO_ADMIN_EMAIL
 PID_BOOTSTRAP_ADMIN_REALM=pacod
-PID_BOOTSTRAP_ADMIN_ROLES=id.admin,pacod.superuser,pacod.admin,gw.platform_admin,cms.platform_admin,kb.admin,bench.admin,broker.admin
+PID_BOOTSTRAP_ADMIN_ROLES=id.admin,pacod.superuser,pacod.admin,gw.platform_admin,cms.platform_admin,kb.admin,bench.admin,broker.admin,agg.admin
 PID_EMAIL_FROM_ADDRESS=id@$d
 PID_EMAIL_FROM_NAME=pacod (demo)
 PID_LOG=$log_level,sqlx=warn
@@ -404,6 +409,7 @@ CMS_STUDIO_ORIGIN=$(url "$studio")
 KB_ORIGIN=$(url kb)
 BENCH_ORIGIN=$(url bench)
 BROKER_ORIGIN=$(url broker)
+AGG_CONSOLE_URL=$(url agg)
 PACOD_WEB_CLIENT_SECRET=$PACOD_WEB_CLIENT_SECRET
 PACOD_API_CLIENT_SECRET=$PACOD_API_CLIENT_SECRET
 PGW_UI_CLIENT_SECRET=$PGW_UI_CLIENT_SECRET
@@ -417,6 +423,8 @@ BENCH_ID_UI_SECRET=$BENCH_ID_UI_SECRET
 BENCH_ID_SERVICE_SECRET=$BENCH_ID_SERVICE_SECRET
 BROKER_ID_SERVICE_SECRET=$BROKER_ID_SERVICE_SECRET
 BROKER_UI_CLIENT_SECRET=$BROKER_UI_CLIENT_SECRET
+AGG_ID_CLIENT_SECRET=$AGG_ID_CLIENT_SECRET
+AGG_UI_CLIENT_SECRET=$AGG_UI_CLIENT_SECRET
 EOF
 
 # ---- pacod-gw ---------------------------------------------------------------------------------
@@ -484,6 +492,12 @@ EOF
 # The broker's own settings are in overlays/broker.yml; its log format is the demo's.
 cat > "$state/env/broker.env" <<EOF
 BROKER_LOG_FORMAT=$log_format
+EOF
+
+# ---- pacod-aggregator -------------------------------------------------------------------------
+# The aggregator's own settings are in overlays/agg.yml; its log format is the demo's.
+cat > "$state/env/agg.env" <<EOF
+AGG_LOG_FORMAT=$log_format
 EOF
 
 # ---- pacod-ap ---------------------------------------------------------------------------------

@@ -41,6 +41,7 @@ services:
       AP_DB_PASSWORD: ${AP_DB_PASSWORD}
       KB_DATABASE_PASSWORD: ${KB_DATABASE_PASSWORD}
       BENCH_DB_PASSWORD: ${BENCH_DB_PASSWORD}
+      AGG_DB_PASSWORD: ${AGG_DB_PASSWORD}
     volumes: !override
       - ../pacod-id/platform/postgres:/initdb.d/id:ro
       - ../pacod-gw/platform/postgres:/initdb.d/gw:ro
@@ -48,6 +49,7 @@ services:
       - ../pacod-ap/platform/postgres/ap-db.sh:/initdb.d/ap/ap-db.sh:ro
       - ../pacod-kb/platform/postgres:/initdb.d/kb:ro
       - ../pacod-benchmark/platform/postgres:/initdb.d/bench:ro
+      - ../pacod-aggregator/platform/postgres:/initdb.d/agg:ro
 
   # ---- Vectors: one Qdrant; the app's collections are pacod_*, the knowledge base's kb_* --------
   pacod-qdrant:
@@ -112,6 +114,8 @@ services:
       BENCH_SITE: ${BENCH_SITE}
       BROKER_SITE: ${BROKER_SITE}
       BROKER_API_SITE: ${BROKER_API_SITE}
+      AGG_SITE: ${AGG_SITE}
+      AGG_API_SITE: ${AGG_API_SITE}
       # The home page's notice of the nightly reset (the Makefile's scheduler).
       DEMO_RESET: ${DEMO_RESET}
       DEMO_RESET_TIME: ${DEMO_RESET_TIME}
@@ -130,6 +134,7 @@ services:
       KB_CADDY_LOG_FORMAT: ${KB_CADDY_LOG_FORMAT}
       BENCH_CADDY_LOG_FORMAT: ${BENCH_CADDY_LOG_FORMAT}
       BROKER_CADDY_LOG_FORMAT: ${BROKER_CADDY_LOG_FORMAT}
+      AGG_CADDY_LOG_FORMAT: ${AGG_CADDY_LOG_FORMAT}
     volumes: !override
       - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
       - ../pacod-id/platform/caddy/id.caddy:/etc/caddy/sites/id.caddy:ro
@@ -141,6 +146,7 @@ services:
       - ../pacod-kb/platform/caddy/kb.caddy:/etc/caddy/sites/kb.caddy:ro
       - ../pacod-benchmark/platform/caddy/bench.caddy:/etc/caddy/sites/bench.caddy:ro
       - ../pacod-broker/platform/caddy/broker.caddy:/etc/caddy/sites/broker.caddy:ro
+      - ../pacod-aggregator/platform/caddy/agg.caddy:/etc/caddy/sites/agg.caddy:ro
       - ./home:/srv/home:ro
       # The certificate and key that demo.env names (DEMO_TLS_CERT, DEMO_TLS_KEY).
       - ./certs:/etc/caddy/tls:ro
@@ -164,6 +170,8 @@ services:
           - bench.${DEMO_DOMAIN}
           - broker.${DEMO_DOMAIN}
           - broker-api.${DEMO_DOMAIN}
+          - agg.${DEMO_DOMAIN}
+          - agg-api.${DEMO_DOMAIN}
           - agents.${DEMO_DOMAIN}
           - grafana.${DEMO_DOMAIN}
           - mail.${DEMO_DOMAIN}
@@ -196,8 +204,10 @@ services:
       - ../pacod-ap/platform/prometheus/ap.yml:/etc/prometheus/scrape.d/ap.yml:ro
       - ../pacod-benchmark/platform/prometheus/bench.yml:/etc/prometheus/scrape.d/bench.yml:ro
       - ../pacod-broker/platform/prometheus/broker.yml:/etc/prometheus/scrape.d/broker.yml:ro
+      - ../pacod-aggregator/platform/prometheus/agg.yml:/etc/prometheus/scrape.d/agg.yml:ro
       - ../pacod-gw/platform/prometheus/gw-broker.yml:/etc/prometheus/scrape.d/gw-broker.yml:ro
       - ../pacod-broker/deploy/prometheus/rules:/etc/prometheus/rules/broker:ro
+      - ../pacod-aggregator/deploy/prometheus/rules:/etc/prometheus/rules/agg:ro
       - pacod-prometheus-data:/prometheus
 
   pacod-alertmanager:
@@ -228,6 +238,7 @@ services:
       - ../pacod-gw/deploy/grafana/dashboards:/etc/grafana/dashboards/gw:ro
       - ../pacod-ap/monitoring/grafana/dashboards:/etc/grafana/dashboards/ap:ro
       - ../pacod-broker/deploy/grafana/dashboards:/etc/grafana/dashboards/broker:ro
+      - ../pacod-aggregator/deploy/grafana/dashboards:/etc/grafana/dashboards/agg:ro
       - pacod-grafana-data:/var/lib/grafana
 
 networks:

@@ -36,6 +36,7 @@ SHOTS = [
     ("kb", E["KB_ORIGIN"] + "/kb"),
     ("bench", E["BENCH_ORIGIN"] + "/"),
     ("broker", E["BROKER_ORIGIN"] + "/catalogue"),
+    ("aggregator", E["AGG_CONSOLE_URL"] + "/catalogue"),
 ]
 
 
