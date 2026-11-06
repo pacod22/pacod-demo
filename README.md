@@ -2,7 +2,8 @@
 
 The whole pacod stack on one machine: identity (pacod-id), the AI gateway (pacod-gw), the agent
 platform (pacod-ap), the CMS (pacod-cms), the knowledge base (pacod-kb), the gateway's
-benchmarks (pacod-benchmark) and the discovery broker (pacod-broker), working together as one
+benchmarks (pacod-benchmark), the discovery broker (pacod-broker) and model data from the vendors'
+own pages (pacod-aggregator), working together as one
 platform. One configuration file, one `make`.
 
 ```sh
@@ -24,13 +25,14 @@ administration and its websites.
 
 - Docker with Compose 2.24 or newer, and make. Everything else (secret generation, the
   bootstrap, the checks) runs in containers.
-- The seven repositories checked out next to this one, on the branch with the shared-network
+- The eight repositories checked out next to this one, on the branch with the shared-network
   layout (`pacod-net`):
 
   ```
   pacod/
     pacod-demo/   (this)
     pacod-id/  pacod-gw/  pacod-ap/  pacod-cms/  pacod-kb/  pacod-benchmark/  pacod-broker/
+    pacod-aggregator/
   ```
 
 - Memory: 8 GB for Docker (Docker Desktop's default setting); the whole stack with the real
@@ -57,6 +59,8 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 | https://bench.demo.pacod.io | benchmarks of the gateway (pacod-benchmark): suites, runs, comparisons; published reports show in the gateway console |
 | https://broker.demo.pacod.io | the discovery broker's console (pacod-broker): resources, providers, reputation, leases |
 | https://broker-api.demo.pacod.io/v1 | the broker's public API: `POST /v1/discover`, announcements, MCP at `/mcp` |
+| https://agg.demo.pacod.io | the aggregator's console (pacod-aggregator): vendors, their pages, runs, the catalogue |
+| https://agg-api.demo.pacod.io/v1 | the aggregator's catalogue: models, parameters and prices. It takes a token. |
 | https://agents.demo.pacod.io/v1 | pacod-ap's offered agents as an OpenAI-compatible API (an agent's slug is the model), and their reference facts over MCP at `/mcp`; both need a pacod-id token, and pacod-broker lists them |
 | https://id.demo.pacod.io/admin | identity administration (pacod-id) |
 | https://grafana.demo.pacod.io | dashboards of every product |
@@ -80,7 +84,7 @@ sets and the seeds. (When only one product changed, `make redeploy S="<service>.
 recreates just those services; see [Re-deploying](#re-deploying).)
 
 - **From scratch**, every website with its content (this also deletes the accounts, keys and
-  data of every product; demo.env and demo.local.env stay): pull the seven repositories, then
+  data of every product; demo.env and demo.local.env stay): pull the eight repositories, then
   `make build`, `make clean`, `make up`.
 - **Keeping the data**: pull, `make build`, `make up`, then fill each empty website:
   `make cms-seed SITE=demo`, `make cms-seed SITE=minimal` and `make cms-seed SITE=space DEMO=space`.
@@ -236,7 +240,7 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
 
 ## Updating
 
-After pulling this repository and the seven products:
+After pulling this repository and the eight products:
 
 ```sh
 make build      # make up builds only missing images: without this the old ones keep running
@@ -274,17 +278,17 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
 
 ## How it is put together
 
-- **Two networks, unique names.** All seven repositories follow one convention
+- **Two networks, unique names.** All eight repositories follow one convention
   ([docs/NETWORK.md](docs/NETWORK.md)): every container joins the external network `pacod-net`
   under a name unique across the repositories. Shared components are `pacod-*`; everything else
-  carries its owner's prefix (`gw-`, `ap-`, `cms-`, `kb-`, `bench-`, `broker-`). The gateway's
+  carries its owner's prefix (`gw-`, `ap-`, `cms-`, `kb-`, `bench-`, `broker-`, `agg-`). The gateway's
   management API, pacod-id's internal listener, the benchmark's API and the broker's admin API are
   on the internal network `pacod-admin-net` alone, as `pacod-gw-admin:8081`,
   `pacod-id-internal:8071`, `bench-api-internal:8190` and `pacod-broker-admin:8061`, and only
   their callers join it.
 - **The repositories' own compose files.** Each repository splits its compose setup into an
   app file (its own services) and a standalone file (its own copies of the shared components,
-  for running it alone). [compose.yml](compose.yml) includes the seven app files unchanged; a
+  for running it alone). [compose.yml](compose.yml) includes the eight app files unchanged; a
   small overlay per repository ([overlays/](overlays/)) only removes published ports, points
   settings at the demo's files and sets the public addresses.
 - **One of each shared component** ([platform.yml](platform.yml)): one Caddy, one PostgreSQL

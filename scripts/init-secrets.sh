@@ -61,6 +61,13 @@ need BENCH_KEK b64 32
 need BROKER_ID_SERVICE_SECRET hex 32
 need BROKER_UI_CLIENT_SECRET hex 32
 need BROKER_UI_SESSION_SECRET hex 32
+# pacod-aggregator: its database, its service client, its console's client and session, and what
+# its scraper presents on the internal API.
+need AGG_DB_PASSWORD hex 24
+need AGG_ID_CLIENT_SECRET hex 32
+need AGG_UI_CLIENT_SECRET hex 32
+need AGG_UI_SESSION_SECRET hex 32
+need AGG_INTERNAL_TOKEN hex 32
 
 # pacod-gw.
 need PGW_KEK b64 32

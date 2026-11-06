@@ -1,0 +1,40 @@
+# Adapts pacod-aggregator's app file (../pacod-aggregator/deploy/docker-compose.yml) to the full
+# stack: the server and its console sign in through the shared pacod-id (AGG_AUTH=oidc), take the
+# demo's secrets and log level, and the demo's gateway reads the vendors' pages. The app file
+# publishes no ports (the edge serves the catalogue and the console) and carries its own builds.
+#
+# The admin and internal API stay on pacod-admin-net under the alias pacod-aggregator-admin
+# (docs/NETWORK.md): the console and the scraper reach it there, nothing else does. agg-browser is
+# on agg-browser-net alone, so a page it renders reaches nothing but the scraper's egress proxy.
+#
+# AGG_GW_KEY is the aggregator's key at the gateway: the bootstrap makes it, and make up recreates
+# the server then. Until then, and until an administrator names the extraction model in the
+# console's Settings, pages are fetched but not read: the catalogue holds what the lists say.
+services:
+  pacod-aggregator:
+    environment:
+      RUST_LOG: ${DEMO_LOG_LEVEL},sqlx=warn
+      AGG_LOG_FORMAT: ${DEMO_LOG_FORMAT}
+      AGG_AUTH: oidc
+      AGG_ID_ISSUER: ${PACOD_ID_ISSUER}
+      AGG_ID_CLIENT_SECRET: ${AGG_ID_CLIENT_SECRET}
+      AGG_INTERNAL_TOKEN: ${AGG_INTERNAL_TOKEN}
+      AGG_PUBLIC_URL: ${AGG_API_ORIGIN}
+      AGG_LLM_URL: http://pacod-gw:8080/v1
+      AGG_LLM_KEY: ${AGG_GW_KEY:-}
+    depends_on:
+      pacod-id:
+        condition: service_healthy
+
+  agg-scraper:
+    environment:
+      RUST_LOG: ${DEMO_LOG_LEVEL}
+      AGG_LOG_FORMAT: ${DEMO_LOG_FORMAT}
+      AGG_INTERNAL_TOKEN: ${AGG_INTERNAL_TOKEN}
+
+  agg-console:
+    environment:
+      AGG_CONSOLE_URL: ${AGG_CONSOLE_URL}
+      AGG_ID_ISSUER: ${PACOD_ID_ISSUER}
+      AGG_UI_CLIENT_SECRET: ${AGG_UI_CLIENT_SECRET}
+      AGG_UI_SESSION_SECRET: ${AGG_UI_SESSION_SECRET}

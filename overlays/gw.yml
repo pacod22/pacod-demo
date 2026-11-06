@@ -59,6 +59,10 @@ services:
       # token (broker.consumer) comes from the bootstrap; until then the core leaves the broker be.
       PGW_BROKER_URL: http://pacod-broker:8060
       PGW_BROKER_TOKEN: ${PGW_BROKER_TOKEN:-}
+      # pacod-aggregator (overlays/agg.yml): the daily sync of model data. The bootstrap makes the
+      # token (agg.consumer); until then a sync is refused, and the models keep their prices.
+      PGW_AGGREGATOR_URL: http://pacod-aggregator:8150
+      PGW_AGGREGATOR_TOKEN: ${PGW_AGGREGATOR_TOKEN:-}
     depends_on:
       pacod-id:
         condition: service_healthy

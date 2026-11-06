@@ -40,17 +40,23 @@ if [ "$(docker network inspect -f '{{.Internal}}' pacod-admin-net 2>/dev/null)" 
 else
 	report FAIL "pacod-admin-net is internal" "missing or with a route out"
 fi
-expected=" pacod-id pacod-gw gw-console gw-analytics gw-tester ap-frontend ap-api ap-admin-api cms-studio kb-ui bench-api bench-ui pacod-broker broker-console gw-broker "
+expected=" pacod-id pacod-gw gw-console gw-analytics gw-tester ap-frontend ap-api ap-admin-api cms-studio kb-ui bench-api bench-ui pacod-broker broker-console gw-broker pacod-aggregator agg-scraper agg-console "
 others=
 for c in $(docker network inspect -f '{{range .Containers}}{{.Name}} {{end}}' pacod-admin-net 2>/dev/null); do
 	case "$expected" in *" $c "*) ;; *) others="$others$c " ;; esac
 done
 if [ -z "$others" ]; then report PASS "only the listeners and their callers join it"; else report FAIL "only the listeners and their callers join it" "also: $others"; fi
+# What a page runs in reaches nothing but the scraper's egress proxy.
+browser_nets=$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' agg-browser 2>/dev/null)
+case "$browser_nets" in
+	*agg-browser-net\ ) if [ "$(echo "$browser_nets" | wc -w)" -eq 1 ]; then report PASS "agg-browser is on agg-browser-net alone"; else report FAIL "agg-browser is on agg-browser-net alone" "$browser_nets"; fi ;;
+	*) report FAIL "agg-browser is on agg-browser-net alone" "${browser_nets:-not running}" ;;
+esac
 probe() { docker run --rm --network "$1" busybox:1.38.0 wget -q -T 3 -O /dev/null "$2" >/dev/null 2>&1; }
-for target in http://pacod-gw:8081/readyz http://pacod-id:8071/oidc/jwks http://bench-api:8190/api/v1/healthz http://pacod-broker:8061/healthz; do
+for target in http://pacod-gw:8081/readyz http://pacod-id:8071/oidc/jwks http://bench-api:8190/api/v1/healthz http://pacod-broker:8061/healthz http://pacod-aggregator:8151/healthz; do
 	if probe pacod-net "$target"; then report FAIL "$target refused on pacod-net" "it answered"; else report PASS "$target refused on pacod-net"; fi
 done
-for target in http://pacod-gw-admin:8081/readyz http://pacod-id-internal:8071/oidc/jwks http://bench-api-internal:8190/api/v1/healthz http://pacod-broker-admin:8061/healthz; do
+for target in http://pacod-gw-admin:8081/readyz http://pacod-id-internal:8071/oidc/jwks http://bench-api-internal:8190/api/v1/healthz http://pacod-broker-admin:8061/healthz http://pacod-aggregator-admin:8151/healthz; do
 	if probe pacod-admin-net "$target"; then report PASS "$target answers on pacod-admin-net"; else report FAIL "$target answers on pacod-admin-net"; fi
 done
 

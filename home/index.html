@@ -432,6 +432,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 		<a href="#pacod-kb"><span class="badge">KB</span>pacod-kb</a>
 		<a href="#pacod-benchmark"><span class="badge">BM</span>pacod-benchmark</a>
 		<a href="#pacod-broker"><span class="badge">BR</span>pacod-broker</a>
+		<a href="#pacod-aggregator"><span class="badge">AG</span>pacod-aggregator</a>
 	</div>
 
 	<section class="section" id="products">
@@ -659,6 +660,30 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 					<a class="frame" href="{{$s}}://broker.{{$d}}{{$p}}/catalogue">
 						<div class="bar"><i></i><i></i><i></i><span>broker.{{$d}}{{$p}}/catalogue</span></div>
 						<img src="screenshots/broker.png" width="1280" height="800" loading="lazy" alt="pacod-broker's console: the resources on the broker, with their kind, provider, status and price now">
+					</a>
+				</div>
+			</article>
+
+			<!-- pacod-aggregator -->
+			<article class="product" id="pacod-aggregator">
+				<div>
+					<div class="head"><span class="badge">AG</span><h3>pacod-aggregator</h3></div>
+					<div class="role">Model data</div>
+					<p>Which LLM models a vendor offers, what they can do, which parameters they take and what they cost, read from the vendors' own pages in a headless browser and published as one catalogue. A weekly scan proposes the pages to read; an administrator confirms them.</p>
+					<p>Here pacod-gw takes its model data from it once a day. It can take the same from OpenRouter, LiteLLM or a file instead.</p>
+					<ul class="stack"><li>Rust</li><li>axum</li><li>Chromium</li><li>pacod-id</li><li>SvelteKit</li></ul>
+					<div class="links">
+						<div class="btns">
+							<a class="btn primary" href="{{$s}}://agg.{{$d}}{{$p}}/">Console</a>
+							<a class="btn" href="{{$s}}://console.{{$d}}{{$p}}/platform/model-data">In the gateway console</a>
+						</div>
+						<div class="ext"><a href="https://github.com/pacod22/pacod-aggregator">Repository</a></div>
+					</div>
+				</div>
+				<div class="shots">
+					<a class="frame" href="{{$s}}://agg.{{$d}}{{$p}}/catalogue">
+						<div class="bar"><i></i><i></i><i></i><span>agg.{{$d}}{{$p}}/catalogue</span></div>
+						<img src="screenshots/aggregator.png" width="1280" height="800" loading="lazy" alt="pacod-aggregator's console: the catalogue, with each model's vendor, status, context window and prices">
 					</a>
 				</div>
 			</article>

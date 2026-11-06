@@ -64,6 +64,13 @@ include:
       - overlays/broker.yml
     env_file: [.state/env/stack.env, .state/env/broker.env]
 
+  # pacod-aggregator: model data from the vendors' own pages (server, scraper, browser, console),
+  # which pacod-gw's core syncs daily.
+  - path:
+      - ../pacod-aggregator/deploy/docker-compose.yml
+      - overlays/agg.yml
+    env_file: [.state/env/stack.env, .state/env/agg.env]
+
   # The shared layer: one PostgreSQL, Qdrant, mail sink, edge and monitoring stack.
   - path: platform.yml
     env_file: [.state/env/stack.env]

@@ -22,6 +22,7 @@ Every person signs in through pacod-id; every model call goes through pacod-gw, 
 - [pacod-kb, the knowledge base]({{$s}}://kb.{{$d}}{{$p}}/kb): ingests files and web pages, converts them to Markdown and indexes them for hybrid semantic and keyword search.
 - [pacod-benchmark]({{$s}}://bench.{{$d}}{{$p}}/): measures pacod-gw and other gateways over a matrix of settings; reports are published to the gateway console.
 - [pacod-broker]({{$s}}://broker.{{$d}}{{$p}}/): a catalogue of models, MCP servers, agents and compute with prices, availability and reputation; its public API is at {{$s}}://broker-api.{{$d}}{{$p}}/v1 (POST /v1/discover, and MCP at /mcp).
+- [pacod-aggregator]({{$s}}://agg.{{$d}}{{$p}}/): which LLM models each vendor offers, what they can do, which parameters they take and what they cost, read from the vendors' own pages; pacod-gw takes it once a day.
 
 ## Platform
 

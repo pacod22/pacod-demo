@@ -1,5 +1,5 @@
 #!/bin/sh
-# Checks the machine before `make up`: Docker and Compose, memory and disk, the seven sibling
+# Checks the machine before `make up`: Docker and Compose, memory and disk, the eight sibling
 # repositories (on the shared-network layout) and every file the demo mounts from them, that no
 # other pacod stack holds the shared container names, the admin password's length, the HTTPS
 # certificate and the demo's ports. Prints what it finds; exits 1 on a blocking problem.
@@ -47,9 +47,9 @@ else
 	ok "free disk ${free_gib} GiB"
 fi
 
-for r in pacod-id pacod-gw pacod-ap pacod-cms pacod-kb pacod-benchmark pacod-broker; do
+for r in pacod-id pacod-gw pacod-ap pacod-cms pacod-kb pacod-benchmark pacod-broker pacod-aggregator; do
 	if [ ! -d "../$r" ]; then
-		bad "../$r is missing: the demo builds from the seven sibling checkouts"
+		bad "../$r is missing: the demo builds from the eight sibling checkouts"
 		continue
 	fi
 	if [ ! -d "../$r/platform" ]; then
@@ -60,7 +60,7 @@ for r in pacod-id pacod-gw pacod-ap pacod-cms pacod-kb pacod-benchmark pacod-bro
 	# The listeners only servers reach moved to pacod-admin-net in every repository at once; a
 	# checkout from before would call addresses that no longer answer, or refuse the aliases as
 	# listen addresses (pacod-id and pacod-gw before 3872f32 and the gateway's network commit).
-	case $r in pacod-id) app=deploy/compose/docker-compose.yml ;; pacod-gw|pacod-broker) app=deploy/docker-compose.yml ;;
+	case $r in pacod-id) app=deploy/compose/docker-compose.yml ;; pacod-gw|pacod-broker|pacod-aggregator) app=deploy/docker-compose.yml ;;
 		pacod-ap) app=pacod-api/docker-compose.yml ;; *) app=docker-compose.yml ;; esac
 	if ! grep -q pacod-admin-net "../$r/$app" 2>/dev/null; then
 		bad "../$r ($branch) is from before pacod-admin-net: check out its branch pacod-admin-net, or one based on it (pacod-id: rebase pacod-vanga onto it)"
@@ -112,7 +112,7 @@ done
 # The shared names (pacod-*) exist once per host: another pacod stack must be stopped first. The
 # demo's nightly reset runs outside its compose project (Makefile: scheduler).
 others=$(docker ps --format '{{.Names}} {{.Label "com.docker.compose.project"}}' |
-	awk '$2 != "pacod-demo" && $1 != "pacod-demo-reset" && ($1 ~ /^(pacod|gw|ap|cms|kb|bench|broker|id)-/) {print $1 " (" $2 ")"}')
+	awk '$2 != "pacod-demo" && $1 != "pacod-demo-reset" && ($1 ~ /^(pacod|gw|ap|cms|kb|bench|broker|agg|id)-/) {print $1 " (" $2 ")"}')
 if [ -n "$others" ]; then
 	bad "other pacod containers are running; stop their stacks first: $(echo "$others" | tr '\n' ' ')"
 else

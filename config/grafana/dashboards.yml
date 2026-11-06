@@ -37,3 +37,14 @@ providers:
     updateIntervalSeconds: 30
     options:
       path: /etc/grafana/dashboards/broker
+
+  - name: pacod-aggregator
+    orgId: 1
+    folder: pacod-aggregator
+    folderUid: pacod-aggregator
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards/agg
