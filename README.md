@@ -39,9 +39,9 @@ administration and its websites.
   embedding model uses about 5 GiB (measured before pacod-benchmark joined: it and the gateway's
   load agent and load mock add under 100 MiB at rest). Below that, the default `EMBEDDINGS_BACKEND=auto`
   picks a light stand-in (about 4 GiB). Disk: about 30 GiB for the
-  images. The first `make up` builds every image from source (three Rust workspaces, a Maven
-  build, several Python images, three SvelteKit apps): 30 to 60 minutes. Later starts take about
-  two minutes.
+  images. The first `make up` builds every image from source, one service at a time (three Rust
+  workspaces, a Maven build, several Python images, three SvelteKit apps): 30 to 60 minutes. Later
+  starts take about two minutes.
 
 ## The addresses
 
@@ -343,6 +343,7 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
 | `preflight: ../pacod-<repo>/... is missing`, or `is a directory where ../pacod-<repo> has a file`; or `pacod-caddy` exits at start with nothing on the terminal | A sibling checkout is older than the demo, so a file the demo mounts from it is not there. Compose then mounts an empty directory in its place, and the service reading it fails, saying why only in its log (`docker logs pacod-caddy`: "Could not import ...: is a directory"). Run what the preflight's line says: remove a directory it names (`sudo rmdir`, as Docker made it); restore a file the checkout's git has but the disk lacks (`git -C ../pacod-<repo> checkout -- <path>`, as no pull brings that back); or pull a checkout that is older, whose branch and commit it names (if the pull says up to date, `git -C ../pacod-<repo> status` says why). Then `make up`. |
 | `up` stops with a container unhealthy | `make status`, then `make logs S=<service>`. A first start downloads models; `make up` again continues. |
 | A model download reports "Not enough free disk space", or PostgreSQL fails to write | Docker's own disk is full (Docker Desktop: Settings, Resources, disk usage limit). `docker system df` shows what uses it; `docker builder prune` frees the build cache without touching images or data. |
+| `make build` stops with `Error 255` | The kernel killed compose: the machine ran out of memory (`journalctl -k \| grep -i 'out of memory'`). Builds run one service at a time, but a Rust build beside a running stack can still be too much: add swap, or `make down` first. |
 | Containers exit with code 137 | Docker ran out of memory: give it more (Docker Desktop: Settings, Resources) or set `EMBEDDINGS_BACKEND=hash`. |
 | `init: .state/secrets.env is missing but the demo's volumes exist` | The data needs the secrets that were deleted: `make clean`, then `make up`. |
 | A port (80, 443, 8800) is in use | Change `DEMO_HTTP_PORT` or `DEMO_HTTPS_PORT` in demo.env; then `make clean` and `make up` (the address is part of the sign-in configuration). |

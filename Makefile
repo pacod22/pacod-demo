@@ -62,7 +62,7 @@ help:
 	@echo "  make urls      the addresses and the admin's sign-in"
 	@echo "  make status    the containers and their health"
 	@echo "  make logs S=<service>   follow one service's log (all without S)"
-	@echo "  make build     rebuild the images from the eight checkouts"
+	@echo "  make build     rebuild the images from the eight checkouts, one at a time"
 	@echo "  make bootstrap redo the cross-product credentials (after adding a provider key)"
 	@echo "  make baseline  keep the data as it is now as the state every reset returns to"
 	@echo "  make cms-space create the CMS's Starward website (magazine design) on a stack without it"
@@ -75,7 +75,8 @@ help:
 
 up: preflight network tools init render
 	@echo "up: starting the stack (the first start builds the images and downloads models)"
-	$(COMPOSE) up -d --remove-orphans $(WAIT)
+	@sh scripts/build.sh --missing
+	$(COMPOSE) up -d --remove-orphans --no-build $(WAIT)
 	@$(MAKE) --no-print-directory bootstrap
 	@$(MAKE) --no-print-directory seed
 	@$(MAKE) --no-print-directory first-baseline
@@ -98,7 +99,8 @@ start: network render
 
 redeploy: network render
 	@test -n "$(S)" || { echo 'usage: make redeploy S="<service> [<service>...]"' >&2; exit 1; }
-	$(COMPOSE) up -d --no-deps --build $(WAIT) $(S)
+	@sh scripts/build.sh $(S)
+	$(COMPOSE) up -d --no-deps --no-build $(WAIT) $(S)
 
 restart: render
 	@test -n "$(S)" || { echo 'usage: make restart S="<service> [<service>...]"' >&2; exit 1; }
@@ -306,7 +308,7 @@ remove: clean
 # ---- look -----------------------------------------------------------------------------------------
 
 build: network tools init render
-	COMPOSE_PARALLEL_LIMIT=2 $(COMPOSE) build
+	@sh scripts/build.sh
 
 status ps: render
 	@$(COMPOSE) ps --format 'table {{.Name}}\t{{.Status}}'
