@@ -532,8 +532,7 @@ def aggregator() -> None:
         report(status == 200 and job.get("source") == "pacod_aggregator" and not job.get("problems"),
                "the gateway's sync of model data has no problem", str(job.get("problems")))
         # The only check that takes the three together: the core's fetch, the aggregator, and a
-        # service token of pacod-id's. The settings above would pass with any of them broken. Which
-        # models it applied is not asked: the demo's providers may have no vendor.
+        # service token of pacod-id's. The settings above would pass with any of them broken.
         headers = {"Authorization": f"Bearer {admin}"}
         runs_url = "http://pacod-gw-admin:8081/api/v1/price-job/runs"
         _, before, _ = http("GET", f"{runs_url}?limit=200", headers=headers)
@@ -551,6 +550,15 @@ def aggregator() -> None:
         read = bool(run) and run.get("ok") is True and "skipped" not in (run.get("result") or {})
         report(read, "the gateway's sync reads the aggregator's catalogue",
                str(run.get("message")) if run else "no run finished in two minutes")
+        # A sync that matches no model reads a full catalogue just the same, so reading proves
+        # nothing about the data. The catalogue's lists come from the internet and the demo runs
+        # offline: an empty one is a warning. With models in it, a sync that took none is a failure.
+        counts = ((run or {}).get("result") or {}).get("counts") or {}
+        name = "the gateway's models take data from the catalogue"
+        if models:
+            report(counts.get("applied", 0) + counts.get("unchanged", 0) > 0, name, json.dumps(counts))
+        else:
+            report(None, name, "not tested: the catalogue is empty, and its lists need the internet")
 
 
 def main() -> None:

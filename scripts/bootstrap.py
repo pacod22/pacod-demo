@@ -92,6 +92,9 @@ CMS_STUDIO = "http://cms-studio:7443"
 CMS_ADMIN_NAME = "pacod-demo cms admin"
 # pacod-aggregator's public API, on pacod-net.
 AGG_URL = "http://pacod-aggregator:8150"
+# The mock providers whose models carry real names, with their vendors in pacod-aggregator's
+# catalogue. A provider finds its vendor by its address, and a mock's address matches no preset.
+MOCK_VENDORS = {"mock-deepseek": "deepseek", "mock-gemini": "google", "mock-glm": "zai"}
 # pacod-broker's public API, on pacod-net; its accounts at pacod-id carry this prefix.
 BROKER_URL = "http://pacod-broker:8060"
 BROKER_ACCOUNT = "pacod-demo gw-broker"
@@ -354,6 +357,20 @@ def aggregator() -> None:
         say(f"aggregator: made {var} (agg.consumer)")
 
 
+def model_data(api: gw.Api) -> None:
+    """Gives the mock providers their vendors: without one a provider's models stay out of the
+    gateway's sync, and the catalogue would change nothing here. Each bootstrap writes the
+    providers again without the field. With a real key there are no mock providers, and the real
+    ones find their vendors by address."""
+    for provider in api.items("/providers"):
+        vendor = MOCK_VENDORS.get(provider["name"])
+        if vendor is None or provider.get("catalog_vendor") == vendor:
+            continue
+        body = {k: v for k, v in provider.items() if k not in ("id", "created_at", "updated_at")}
+        api.call("PUT", f"/providers/{provider['id']}", {**body, "catalog_vendor": vendor})
+        say(f"model data: {provider['name']} takes {vendor}'s entries")
+
+
 def bind_platform_role(session: IdSession, principal: str, role: str) -> None:
     """`role` at the platform for `principal`, kept when it is there; waits a moment for the
     role's product to push its catalogue, as a stack that has just started may not have."""
@@ -532,6 +549,7 @@ def main() -> None:
     cms_gateway_key()
     broker(api)
     aggregator()
+    model_data(api)
     say(f"done; credentials in .state/{OUT.name}")
 
 

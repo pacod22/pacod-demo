@@ -238,6 +238,10 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
 `demo.local.env`, then
 `make bootstrap`: the gateway is set up with the real providers.
 
+**Model data.** The aggregator reads the OpenRouter and LiteLLM lists from the internet. Three mock
+providers name a vendor, so the models with real names take their prices and properties from it.
+Offline the catalogue stays empty, and `make verify` warns about that instead of failing.
+
 ## Updating
 
 After pulling this repository and the eight products:
