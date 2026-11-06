@@ -495,9 +495,22 @@ BROKER_LOG_FORMAT=$log_format
 EOF
 
 # ---- pacod-aggregator -------------------------------------------------------------------------
-# The aggregator's own settings are in overlays/agg.yml; its log format is the demo's.
+# The aggregator's own settings are in overlays/agg.yml; its log format is the demo's. Its model is
+# reached through the gateway, unless demo.env names an endpoint of its own. The address and the key
+# are chosen together, so that the gateway's key never goes to another address.
+if [ -n "${AGG_LLM_URL:-}" ]; then
+	agg_llm_url=$AGG_LLM_URL
+	agg_llm_key=${AGG_LLM_KEY:-}
+else
+	agg_llm_url=http://pacod-gw:8080/v1
+	agg_llm_key=${AGG_GW_KEY:-}
+fi
 cat > "$state/env/agg.env" <<EOF
 AGG_LOG_FORMAT=$log_format
+AGG_LLM_URL=$agg_llm_url
+AGG_LLM_KEY=$agg_llm_key
+AGG_LLM_MODEL=${AGG_LLM_MODEL:-}
+AGG_LLM_MAX_TOKENS_FIELD=${AGG_LLM_MAX_TOKENS_FIELD:-}
 EOF
 
 # ---- pacod-ap ---------------------------------------------------------------------------------
