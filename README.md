@@ -242,6 +242,11 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
 providers name a vendor, so the models with real names take their prices and properties from it.
 Offline the catalogue stays empty, and `make verify` warns about that instead of failing.
 
+**The aggregator's model.** It reads the vendors' pages through the gateway, unless you name another
+endpoint. To have it call a provider itself, set `AGG_LLM_URL` and `AGG_LLM_MODEL` in `demo.env` and
+`AGG_LLM_KEY` in `demo.local.env`, then `make up`. The gateway's daily spending cap on its key does
+not apply then, so set a limit at the provider. `demo.env.example` lists the settings.
+
 ## Updating
 
 After pulling this repository and the eight products:
