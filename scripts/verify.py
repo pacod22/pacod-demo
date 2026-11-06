@@ -531,6 +531,26 @@ def aggregator() -> None:
                "the gateway's core has the aggregator's address and token", json.dumps(link))
         report(status == 200 and job.get("source") == "pacod_aggregator" and not job.get("problems"),
                "the gateway's sync of model data has no problem", str(job.get("problems")))
+        # The only check that takes the three together: the core's fetch, the aggregator, and a
+        # service token of pacod-id's. The settings above would pass with any of them broken. Which
+        # models it applied is not asked: the demo's providers may have no vendor.
+        headers = {"Authorization": f"Bearer {admin}"}
+        runs_url = "http://pacod-gw-admin:8081/api/v1/price-job/runs"
+        _, before, _ = http("GET", f"{runs_url}?limit=200", headers=headers)
+        known = {r["id"] for r in before} if isinstance(before, list) else set()
+        status, _, _ = http("POST", "http://pacod-gw-admin:8081/api/v1/price-job/run", headers=headers)
+        report(status == 202, "the gateway takes the order to sync", str(status))
+        run = None
+        for _ in range(60):
+            _, runs, _ = http("GET", f"{runs_url}?job=sync&limit=10", headers=headers)
+            run = next((r for r in runs if isinstance(runs, list) and r.get("job") == "catalog_sync"
+                        and r.get("finished_at") and r.get("id") not in known), None)
+            if run:
+                break
+            time.sleep(2)
+        read = bool(run) and run.get("ok") is True and "skipped" not in (run.get("result") or {})
+        report(read, "the gateway's sync reads the aggregator's catalogue",
+               str(run.get("message")) if run else "no run finished in two minutes")
 
 
 def main() -> None:
