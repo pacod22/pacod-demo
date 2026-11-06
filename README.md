@@ -25,7 +25,7 @@ administration and its websites.
 
 - Docker with Compose 2.24 or newer, and make. Everything else (secret generation, the
   bootstrap, the checks) runs in containers.
-- The seven repositories checked out next to this one, on the branch with the shared-network
+- The eight repositories checked out next to this one, on the branch with the shared-network
   layout (`pacod-net`):
 
   ```
@@ -84,7 +84,7 @@ sets and the seeds. (When only one product changed, `make redeploy S="<service>.
 recreates just those services; see [Re-deploying](#re-deploying).)
 
 - **From scratch**, every website with its content (this also deletes the accounts, keys and
-  data of every product; demo.env and demo.local.env stay): pull the seven repositories, then
+  data of every product; demo.env and demo.local.env stay): pull the eight repositories, then
   `make build`, `make clean`, `make up`.
 - **Keeping the data**: pull, `make build`, `make up`, then fill each empty website:
   `make cms-seed SITE=demo`, `make cms-seed SITE=minimal` and `make cms-seed SITE=space DEMO=space`.
@@ -240,7 +240,7 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
 
 ## Updating
 
-After pulling this repository and the seven products:
+After pulling this repository and the eight products:
 
 ```sh
 make build      # make up builds only missing images: without this the old ones keep running
@@ -278,7 +278,7 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
 
 ## How it is put together
 
-- **Two networks, unique names.** All seven repositories follow one convention
+- **Two networks, unique names.** All eight repositories follow one convention
   ([docs/NETWORK.md](docs/NETWORK.md)): every container joins the external network `pacod-net`
   under a name unique across the repositories. Shared components are `pacod-*`; everything else
   carries its owner's prefix (`gw-`, `ap-`, `cms-`, `kb-`, `bench-`, `broker-`, `agg-`). The gateway's
@@ -288,7 +288,7 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
   their callers join it.
 - **The repositories' own compose files.** Each repository splits its compose setup into an
   app file (its own services) and a standalone file (its own copies of the shared components,
-  for running it alone). [compose.yml](compose.yml) includes the seven app files unchanged; a
+  for running it alone). [compose.yml](compose.yml) includes the eight app files unchanged; a
   small overlay per repository ([overlays/](overlays/)) only removes published ports, points
   settings at the demo's files and sets the public addresses.
 - **One of each shared component** ([platform.yml](platform.yml)): one Caddy, one PostgreSQL

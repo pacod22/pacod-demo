@@ -19,7 +19,7 @@ TOOLS := pacod-demo-tools:dev
 SHOTS := pacod-demo-shots:dev
 # Docker's CLI, make and tar: the nightly reset's scheduler and the baseline's archiver.
 RESET := pacod-demo-reset:dev
-# The compose project: the seven repositories' own compose files plus the shared layer.
+# The compose project: the eight repositories' own compose files plus the shared layer.
 COMPOSE = COMPOSE_PROFILES=$$(cat .state/profiles 2>/dev/null || echo ui) docker compose \
 	--project-directory . -f compose.yml
 # The tools image on pacod-net, and on pacod-admin-net for the gateway's management API, with
@@ -62,7 +62,7 @@ help:
 	@echo "  make urls      the addresses and the admin's sign-in"
 	@echo "  make status    the containers and their health"
 	@echo "  make logs S=<service>   follow one service's log (all without S)"
-	@echo "  make build     rebuild the images from the seven checkouts"
+	@echo "  make build     rebuild the images from the eight checkouts"
 	@echo "  make bootstrap redo the cross-product credentials (after adding a provider key)"
 	@echo "  make baseline  keep the data as it is now as the state every reset returns to"
 	@echo "  make cms-space create the CMS's Starward website (magazine design) on a stack without it"

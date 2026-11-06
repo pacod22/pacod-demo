@@ -1,5 +1,5 @@
 #!/bin/sh
-# Checks the machine before `make up`: Docker and Compose, memory and disk, the seven sibling
+# Checks the machine before `make up`: Docker and Compose, memory and disk, the eight sibling
 # repositories (on the shared-network layout) and every file the demo mounts from them, that no
 # other pacod stack holds the shared container names, the admin password's length, the HTTPS
 # certificate and the demo's ports. Prints what it finds; exits 1 on a blocking problem.
