@@ -495,8 +495,8 @@ def broker() -> None:
         reachable = isinstance(body, dict) and body.get("reachable") is True
         report(status == 200 and reachable, "the gateway's core reaches the broker",
                f"{status} {gw.short(body) if not reachable else ''}")
-    # pacod-ap and the CMS studio search it with their own tokens.
-    for var in ("BROKER_AP_TOKEN", "CMS_BROKER_TOKEN"):
+    # pacod-ap, the CMS studio and pacod-kb search it with their own tokens.
+    for var in ("BROKER_AP_TOKEN", "CMS_BROKER_TOKEN", "KB_BROKER_TOKEN"):
         if not made.get(var):
             report(False, f"{var} searches the broker", "missing (make bootstrap)")
             continue
