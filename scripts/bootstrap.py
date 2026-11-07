@@ -34,6 +34,8 @@ products already ship, pointed at the demo's files instead of a checkout's.
    at the platform for pacod-ap (BROKER_AP_TOKEN: its agents' search tool, the console's Broker
    page, the agents and the MCP server it announces); one holding broker.consumer for the CMS
    studio (CMS_BROKER_TOKEN: reputation and the broker's models on the installation screen);
+   one holding broker.consumer for pacod-kb (KB_BROKER_TOKEN: its read-only Broker page, which
+   announces nothing);
    and broker.provisioner at the platform for the studio's provisioner account, with which the
    studio makes each organisation's own provider account when it first offers a website.
 
@@ -336,6 +338,8 @@ def broker(api: gw.Api) -> None:
     # The CMS studio reads with this one; each organisation announces with its own, which the
     # studio's provisioner makes (pacod-cms's BrokerProviders), hence broker.provisioner.
     mint("CMS_BROKER_TOKEN", "pacod-demo cms broker", [("broker.consumer", "platform")])
+    # pacod-kb only reads the broker (its Broker page), so its own account holds broker.consumer.
+    mint("KB_BROKER_TOKEN", "pacod-demo kb broker", [("broker.consumer", "platform")])
     provisioner = gw.read_env(OUT).get("PACOD_ID_PROVISIONER_ACCOUNT")
     if provisioner:
         session = session or IdSession(ident["PID_BOOTSTRAP_ADMIN_EMAIL"], ident["PID_BOOTSTRAP_ADMIN_PASSWORD"])
