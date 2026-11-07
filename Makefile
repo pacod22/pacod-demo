@@ -149,13 +149,15 @@ render: demo.env
 	@sh scripts/render-env.sh
 
 # The cross-product credentials (gateway keys, service tokens), then the services that read them
-# are recreated with the new values (compose recreates only those whose settings changed).
+# are recreated with the new values (compose recreates only those whose settings changed). Last,
+# pacod-ap's starter agent is offered on pacod-broker as demo.env's AP_BROKER_OFFER says.
 bootstrap: network tools render
 	@$(TOOLS_RUN) python3 -I /work/scripts/bootstrap.py
 	@sh scripts/render-env.sh
 	$(COMPOSE) up -d --no-deps $(WAIT) $(RECREATE)
 	@# pacod-gw's bridge to pacod-broker: its profile is on once the bootstrap made its tokens.
 	@if grep -q broker .state/profiles; then $(COMPOSE) up -d --no-deps $(WAIT) gw-broker; fi
+	@sh scripts/broker-offer.sh
 
 # The app's own seed (pacod-ap's bootstrap-local): tables, the starter agent's facts, dev users,
 # and its corpus when its ingestion runs. Each step is idempotent.

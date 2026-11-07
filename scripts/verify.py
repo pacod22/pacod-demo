@@ -503,6 +503,44 @@ def broker() -> None:
         auth = {"Authorization": f"Bearer {made[var]}"}
         status, _, _ = http("POST", "http://pacod-broker:8060/v1/discover", body={"limit": 1}, headers=auth)
         report(status == 200, f"{var} searches the broker", str(status))
+    # pacod-ap's own view of the connection the bootstrap provisioned: its Broker page's "Test
+    # connection" (the broker answers, and takes pacod-ap's token).
+    if PUBLIC:
+        report(None, "pacod-ap's connection to the broker",
+               "skipped: the test signs in with a dev token, and a public demo has none")
+    else:
+        status, body, _ = http("POST", "http://ap-admin-api:8000/api/v1/broker/config/test",
+                               headers={"Authorization": "Bearer dev-token-test_user"})
+        ok = status == 200 and isinstance(body, dict) and body.get("reachable") and body.get("accepted")
+        report(bool(ok), "pacod-ap reaches the broker, which takes its token",
+               f"as {body.get('client')}, token from the {body.get('token')}" if ok else f"{status} {gw.short(body)}")
+    # The starter agent, offered as demo.env's AP_BROKER_OFFER says (scripts/broker-offer.sh), is
+    # on the broker: ap-admin-api announces it within a minute of the offer.
+    offer, token = E.get("AP_BROKER_OFFER", ""), made.get("BROKER_AP_TOKEN")
+    if not offer:
+        report(None, "pacod-ap's starter agent on the broker", "not offered (AP_BROKER_OFFER is empty)")
+    elif token:
+        found, deadline = None, time.monotonic() + 90
+        while found is None:
+            status, body, _ = http("POST", "http://pacod-broker:8060/v1/discover",
+                                   body={"kind": "agent", "limit": 50},
+                                   headers={"Authorization": f"Bearer {token}"})
+            hits = body.get("hits", []) if isinstance(body, dict) else []
+            found = next((h for h in hits if (h.get("provider") or {}).get("name") == "pacod-ap"
+                          and (h.get("resource") or {}).get("key") == "agent.starter"), None)
+            if found is None:
+                if time.monotonic() > deadline:
+                    break
+                time.sleep(5)
+        resource = (found or {}).get("resource") or {}
+        urls = [i.get("url") for i in resource.get("interfaces") or []]
+        report(found is not None and E["AP_AGENTS_ORIGIN"] + "/v1" in urls,
+               "the broker lists pacod-ap's starter agent at the agents' site",
+               f"{resource.get('id')} at {', '.join(map(str, urls))}" if found else
+               f"{status}: not announced within 90 s (ap-admin-api's broker_announce_failed, make bootstrap)")
+        if found:
+            seen = (resource.get("access") or {}).get("visibility")
+            report(seen == offer, "offered as demo.env says", f"{seen} (AP_BROKER_OFFER={offer})")
     # The agents' site answers, and only with a token.
     status, _, _ = http("POST", E["AP_AGENTS_ORIGIN"] + "/mcp", body={"jsonrpc": "2.0", "id": 1, "method": "ping"})
     report(status == 401, "the agents' MCP (agents.) refuses a call without a token", str(status))
