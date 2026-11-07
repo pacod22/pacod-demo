@@ -495,22 +495,24 @@ BROKER_LOG_FORMAT=$log_format
 EOF
 
 # ---- pacod-aggregator -------------------------------------------------------------------------
-# The aggregator's own settings are in overlays/agg.yml; its log format is the demo's. Its model is
-# reached through the gateway, unless demo.env names an endpoint of its own. The address and the key
-# are chosen together, so that the gateway's key never goes to another address.
-if [ -n "${AGG_LLM_URL:-}" ]; then
-	agg_llm_url=$AGG_LLM_URL
-	agg_llm_key=${AGG_LLM_KEY:-}
-else
-	agg_llm_url=http://pacod-gw:8080/v1
-	agg_llm_key=${AGG_GW_KEY:-}
+# The aggregator's own settings are in overlays/agg.yml; its log format is the demo's. Its console
+# switches its model between two endpoints, so both are written here: gateway mode's always,
+# standalone mode's as demo.env names them. Each key stays beside its own address, so that the
+# gateway's key never goes to another address. Without an endpoint of its own, AGG_LLM_MODEL names
+# the gateway's model, as it did when there was one endpoint.
+agg_gw_model=${AGG_GW_MODEL:-}
+if [ -z "${AGG_LLM_URL:-}" ] && [ -z "$agg_gw_model" ]; then
+	agg_gw_model=${AGG_LLM_MODEL:-}
 fi
 cat > "$state/env/agg.env" <<EOF
 AGG_LOG_FORMAT=$log_format
-AGG_LLM_URL=$agg_llm_url
-AGG_LLM_KEY=$agg_llm_key
+AGG_LLM_URL=${AGG_LLM_URL:-}
+AGG_LLM_KEY=${AGG_LLM_KEY:-}
 AGG_LLM_MODEL=${AGG_LLM_MODEL:-}
 AGG_LLM_MAX_TOKENS_FIELD=${AGG_LLM_MAX_TOKENS_FIELD:-}
+AGG_GW_URL=http://pacod-gw:8080/v1
+AGG_GW_KEY=${AGG_GW_KEY:-}
+AGG_GW_MODEL=$agg_gw_model
 EOF
 
 # ---- pacod-ap ---------------------------------------------------------------------------------

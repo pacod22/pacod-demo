@@ -7,12 +7,12 @@
 # (docs/NETWORK.md): the console and the scraper reach it there, nothing else does. agg-browser is
 # on agg-browser-net alone, so a page it renders reaches nothing but the scraper's egress proxy.
 #
-# The model that reads the vendors' pages is not set here: scripts/render-env.sh writes AGG_LLM_URL
-# and AGG_LLM_KEY to .state/env/agg.env, and the app file reads them. They are the gateway and
+# The model that reads the vendors' pages is not set here: scripts/render-env.sh writes both of its
+# endpoints to .state/env/agg.env, and the app file reads them. Gateway mode uses the gateway and
 # AGG_GW_KEY, the aggregator's key there, which the bootstrap makes (make up recreates the server
-# then), unless demo.env names an endpoint of its own. Until there is a key and a model, named in
-# demo.env or the console's Settings, pages are fetched but not read: the catalogue holds what the
-# lists say.
+# then). Standalone mode uses the endpoint demo.env names, if any. The console's Settings switch
+# between them. Until there is a key and a model, named in demo.env or those Settings, pages are
+# fetched but not read: the catalogue holds what the lists say.
 services:
   pacod-aggregator:
     environment:

@@ -242,10 +242,13 @@ demo runs offline and `make verify` is deterministic, but chat answers are canne
 providers name a vendor, so the models with real names take their prices and properties from it.
 Offline the catalogue stays empty, and `make verify` warns about that instead of failing.
 
-**The aggregator's model.** It reads the vendors' pages through the gateway, unless you name another
-endpoint. To have it call a provider itself, set `AGG_LLM_URL` and `AGG_LLM_MODEL` in `demo.env` and
-`AGG_LLM_KEY` in `demo.local.env`, then `make up`. The gateway's daily spending cap on its key does
-not apply then, so set a limit at the provider. `demo.env.example` lists the settings.
+**The aggregator's model.** It reads the vendors' pages through the gateway. Its console's Settings
+can switch it to standalone mode, where it calls a provider itself, without a restart. To offer that
+mode, set `AGG_LLM_URL` and `AGG_LLM_MODEL` in `demo.env` and `AGG_LLM_KEY` in `demo.local.env`, then
+`make up`. Until a mode is saved on Settings, it then uses standalone mode, and saving that page
+stores the mode it shows. The gateway's daily spending cap on its key does not apply in that mode,
+so set a limit at the provider.
+`demo.env.example` lists the settings.
 
 ## Updating
 
@@ -260,6 +263,11 @@ make baseline   # ...kept as the state every nightly reset returns to
 
 Without the last two steps every reset puts back the older releases' data, which the products then
 migrate again at each start.
+
+From the update that gave pacod-aggregator its two modes, a stack that reached the gateway keeps
+doing so, in gateway mode. A model saved on the aggregator's Settings before that is now the
+standalone mode's: enter it again there as the model in gateway mode. Until then its pages wait,
+and its Overview says why.
 
 ## Re-deploying
 
