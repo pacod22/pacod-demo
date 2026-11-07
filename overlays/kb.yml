@@ -6,12 +6,12 @@
 # pacod-broker: kb's compose file reads BROKER_URL and BROKER_TOKEN from compose's variables, which
 # in the stack are pacod-ap's (stack.env, for ap-api). kb gets its own: KB_BROKER_TOKEN, a pacod-id
 # service account holding broker.consumer only (scripts/bootstrap.py), as kb only reads the broker.
-# Blank until the bootstrap has made it (the Broker page then reports the broker's refusal).
+# DEMO_BROKER_URL and DEMO_BROKER_TOKEN (demo.env) replace both. Blank until the bootstrap has made it (the Broker page then reports the broker's refusal).
 services:
   kb-pipeline:
     environment:
-      BROKER_URL: http://pacod-broker:8060
-      BROKER_TOKEN: ${KB_BROKER_TOKEN:-}
+      BROKER_URL: ${DEMO_BROKER_URL}
+      BROKER_TOKEN: ${DEMO_BROKER_TOKEN:-${KB_BROKER_TOKEN:-}}
     depends_on:
       pacod-embeddings:
         condition: service_healthy
