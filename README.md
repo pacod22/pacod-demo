@@ -335,6 +335,8 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
   one holding only `broker.consumer` (`KB_BROKER_TOKEN`; it reads the broker and announces
   nothing, and reaches kb-pipeline as `BROKER_URL` and `BROKER_TOKEN` through `overlays/kb.yml`,
   so it never gets pacod-ap's token; kb's admin **Broker** page shows it as the deployment's), and
+  all three connect to the address in `DEMO_BROKER_URL` when demo.env sets one (with `DEMO_BROKER_TOKEN`
+  in demo.local.env replacing their accounts' tokens; empty for a broker in open mode), the stack's own otherwise;
   the studio's provisioner `broker.provisioner`, with which the studio makes each organisation's
   own provider account when that organisation first offers a website. pacod-ap's connection (the
   broker's address on `pacod-net`, `BROKER_AP_TOKEN`, and the `agents.` addresses it announces)

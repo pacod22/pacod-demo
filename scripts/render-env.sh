@@ -270,6 +270,18 @@ case $ap_broker_offer in
 		exit 1 ;;
 esac
 
+# The broker pacod-ap, the CMS studio and pacod-kb connect to: the stack's own by default, or the
+# one DEMO_BROKER_URL names (with DEMO_BROKER_TOKEN for all three instead of the accounts the
+# bootstrap makes). The gateway's bridge and core stay on the stack's own broker.
+broker_url=${DEMO_BROKER_URL:-http://pacod-broker:8060}
+broker_token=${DEMO_BROKER_TOKEN:-}
+case $broker_url in
+	http://* | https://*) ;;
+	*) echo "render-env: DEMO_BROKER_URL=$broker_url is not an http(s) address" >&2
+		exit 1 ;;
+esac
+broker_url=${broker_url%/}
+
 # ---- every include ----------------------------------------------------------------------------
 {
 	cat <<EOF
@@ -283,6 +295,8 @@ DEMO_HTTP_PORT=$p
 DEMO_HTTPS_PORT=$hp
 DEMO_BIND=$DEMO_BIND
 DEMO_PUBLIC=$public
+DEMO_BROKER_URL=$broker_url
+DEMO_BROKER_TOKEN=$broker_token
 # How addresses are spelled: the scheme, and the port when it is not the scheme's default.
 DEMO_URL_SCHEME=$scheme
 DEMO_URL_PORT=$url_port
@@ -470,8 +484,8 @@ PACOD_ID_PROVISIONER_TOKEN=${PACOD_ID_PROVISIONER_TOKEN:-}
 # pacod-broker: reputation and the broker's models on the installation screen (CMS_BROKER_TOKEN,
 # broker.consumer), and the websites offered as datasets, each organisation as its own provider
 # (the provisioner above holds broker.provisioner for that; scripts/bootstrap.py).
-PACOD_BROKER_URL=http://pacod-broker:8060
-PACOD_BROKER_TOKEN=${CMS_BROKER_TOKEN:-}
+PACOD_BROKER_URL=$broker_url
+PACOD_BROKER_TOKEN=${broker_token:-${CMS_BROKER_TOKEN:-}}
 EOF
 
 # ---- pacod-kb ---------------------------------------------------------------------------------
@@ -547,8 +561,8 @@ APP_LOG_FORMAT=$log_format
 # ap-admin-api: the agents' search tool and the console's Broker page read it, ap-admin-api
 # announces the offered agents and the MCP server at the agents' site. The token comes from the
 # bootstrap (broker.consumer and broker.provider); until then nothing is announced or searched.
-BROKER_URL=http://pacod-broker:8060
-BROKER_TOKEN=${BROKER_AP_TOKEN:-}
+BROKER_URL=$broker_url
+BROKER_TOKEN=${broker_token:-${BROKER_AP_TOKEN:-}}
 BROKER_AGENT_URL=$(url agents)
 BROKER_MCP_URL=$(url agents)/mcp
 EOF
