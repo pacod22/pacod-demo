@@ -61,7 +61,7 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 | https://broker-api.demo.pacod.io/v1 | the broker's public API: `POST /v1/discover`, announcements, MCP at `/mcp` |
 | https://agg.demo.pacod.io | the aggregator's console (pacod-aggregator): vendors, their pages, runs, the catalogue |
 | https://agg-api.demo.pacod.io/v1 | the aggregator's catalogue: models, parameters and prices. It takes a token. |
-| https://agents.demo.pacod.io/v1 | pacod-ap's offered agents as an OpenAI-compatible API (an agent's slug is the model), and their reference facts over MCP at `/mcp`; both need a pacod-id token, and pacod-broker lists them |
+| https://agents.demo.pacod.io/v1 | pacod-ap's offered agents as an OpenAI-compatible API (an agent's slug is the model), and their reference facts over MCP at `/mcp`; both need a pacod-id token, and pacod-broker lists them. The starter agent is offered there out of the box (`AP_BROKER_OFFER`) |
 | https://id.demo.pacod.io/admin | identity administration (pacod-id) |
 | https://grafana.demo.pacod.io | dashboards of every product |
 | https://mail.demo.pacod.io | every mail the stack sends (invitations, confirmations) |
@@ -201,8 +201,8 @@ the visitor's own zone and how long until the next reset; `make urls` says it to
 
 `demo.env` is the configuration. It sets the domains (the stack's and the websites') and ports,
 the certificate, the first administrator's email, the nightly reset's time, the optional component
-(`DEMO_PROFILES=ingestion`), the models each product uses, the embedding backend and the log
-directory. Run `make up` after a change. Git
+(`DEMO_PROFILES=ingestion`), the models each product uses, whether pacod-ap's starter agent is
+offered on pacod-broker (`AP_BROKER_OFFER`), the embedding backend and the log directory. Run `make up` after a change. Git
 ignores it: the first `make` copies it from `demo.env.example`, the committed template; change
 the template only for what every machine should get.
 
@@ -333,7 +333,11 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
   its agents' search tool, the console's Broker page, and the agents and the MCP server it
   announces at `agents.`), the CMS studio one holding `broker.consumer` (`CMS_BROKER_TOKEN`), and
   the studio's provisioner `broker.provisioner`, with which the studio makes each organisation's
-  own provider account when that organisation first offers a website. Last, it gives the admin every role of
+  own provider account when that organisation first offers a website. pacod-ap's connection (the
+  broker's address on `pacod-net`, `BROKER_AP_TOKEN`, and the `agents.` addresses it announces)
+  reaches ap-api and ap-admin-api as the deployment's `BROKER_*`: the console's **Broker** page
+  shows it as such, with **Test connection**, and a superuser may change it there (a reset brings
+  the deployment's back). Last, it gives the admin every role of
   `PID_BOOTSTRAP_ADMIN_ROLES` its account lacks, and takes none away: pacod-id gives them only to
   the account it creates, so an account older than a product never got that product's role.
   Then it hands the CMS studio its gateway key live: a `PUT` to cms-studio's
@@ -347,6 +351,19 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
   the next bootstrap; the studio refuses a model the gateway does not offer, or one that cannot do
   a feature's work (alt text needs images), and the bootstrap says so. `make verify` checks that
   the studio holds the key and uses those models.
+- **pacod-ap's starter agent on pacod-broker.** After the bootstrap recreated the app's services,
+  [scripts/broker-offer.sh](scripts/broker-offer.sh) offers the starter as `AP_BROKER_OFFER` says
+  (`platform`, the default: everyone signed in to the demo's pacod-id; `public`; or empty: not
+  offered, and an earlier offer withdrawn) with pacod-ap's own `python -m scripts.agent_editor
+  offer`: a release of the starter's published version with only its offer changed, the agent
+  handed to the agent editor first if it is not there yet (behaviour-neutral, but its settings are
+  then edited in the agent editor, and the older settings pages show them as managed by it).
+  Nothing changes when the published version already says so.
+  It runs in `make up` and in `make reset` (so every night too). ap-admin-api announces the agent
+  at `agents.` within a minute; `make verify` checks that pacod-ap reaches the broker with its
+  token (its Broker page's test) and that the broker lists the starter there, as offered. The
+  starter's turns do not change: it does not search the broker (its `broker_search` tool is opt-in,
+  added in the agent editor).
 
 ## Troubleshooting
 

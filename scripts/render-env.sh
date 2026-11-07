@@ -261,6 +261,15 @@ for pair in "DEMO_HOME_GOOGLE_SITE_VERIFICATION=$home_google_verification" \
 	fi
 done
 
+# pacod-ap's starter agent on pacod-broker (scripts/broker-offer.sh): platform when demo.env does not
+# say (a demo.env made before the setting), empty when it says empty.
+ap_broker_offer=${AP_BROKER_OFFER-platform}
+case $ap_broker_offer in
+	platform | public | "") ;;
+	*) echo "render-env: AP_BROKER_OFFER=$ap_broker_offer is none of platform, public or empty" >&2
+		exit 1 ;;
+esac
+
 # ---- every include ----------------------------------------------------------------------------
 {
 	cat <<EOF
@@ -299,6 +308,8 @@ DEMO_HOME_GOOGLE_TAG=$home_google_tag
 DEMO_HOME_GOOGLE_SITE_VERIFICATION=$home_google_verification
 DEMO_STARWARD_GTM_ID=$starward_gtm_id
 DEMO_STARWARD_GOOGLE_SITE_VERIFICATION=$starward_google_verification
+# pacod-ap's starter agent on pacod-broker (scripts/broker-offer.sh); empty: not offered.
+AP_BROKER_OFFER=$ap_broker_offer
 # The log files' directory on this machine (overlays/ap.yml, cms's LOG_DIR_HOST).
 DEMO_LOG_DIR=$log_dir
 # Every product's log level and format (docs/LOGGING.md); the product files below spell them out.
