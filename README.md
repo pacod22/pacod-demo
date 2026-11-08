@@ -117,8 +117,8 @@ needs:
   answer under `DEMO_DOMAIN` itself (`cms.demo.pacod.io`), the studio starts with a warning, and
   the certificate and DNS need no other name. Over HTTPS only (demo.env.example says what it costs).
 - **DNS:** `demo.pacod.io`, `*.demo.pacod.io` and `*.pacod-sites.net` pointing at the server.
-  Before the DNS is set, `make hosts` prints `/etc/hosts` lines to try it: as they are on the server itself; on another
-  machine, with the server's address instead of 127.0.0.1.
+  Before the DNS is set, `make hosts` prints `/etc/hosts` lines to try it on the server itself, and
+  `make hosts ADDR=<the server's address>` the lines for another machine.
 - **The certificate:** one for `demo.pacod.io`, `*.demo.pacod.io` and `*.pacod-sites.net`, full
   chain, in [certs/](certs/README.md). The files there now are self-signed placeholders: the edge starts,
   but browsers warn and the products' sign-in fails until the real ones replace them. They
@@ -144,6 +144,60 @@ to 127.0.0.1 without DNS; Safari may not: use another browser, or add `make host
 To work on some of the products only, set `DEMO_PRODUCTS` there as well, e.g. `DEMO_PRODUCTS=gw,cms`
 ([Only some products](#configuration-demoenv-and-demolocalenv)): the first `make up` builds fewer
 images, and the stack takes less of Docker's memory.
+
+### A demo on a local server, without DNS
+
+A server on the local network (192.168.1.50 in these examples) with no DNS names of its own. The
+containers need no DNS either way: they reach every address through the edge, whose network
+aliases are those names. Only the browsers have to find the server. HTTPS is not an option here:
+the products verify the certificate when they reach the sign-in at its public address, so a
+self-signed one makes sign-in fail ([certs/](certs/README.md)).
+
+**Through an SSH tunnel**, for one person or a few. The server keeps the settings of
+[a demo on this machine only](#a-demo-on-this-machine-only), and every user runs
+
+```sh
+ssh -N -L 8800:127.0.0.1:8800 user@192.168.1.50
+```
+
+then opens http://localhost:8800, http://app.localhost:8800 and so on, as on the server. The
+stack is still bound to the loopback address, so it keeps what a demo published beyond the
+machine closes: the mail viewer, the dev tokens, `make verify`'s chat turn. Browsers treat
+localhost as a secure context, so everything works as on a laptop.
+
+**Under wildcard DNS names**, for everyone on the network. Services such as nip.io and sslip.io
+answer `*.192.168.1.50.nip.io` with 192.168.1.50, with nothing to set up. In demo.local.env on the
+server, then `make up`:
+
+```sh
+DEMO_DOMAIN=192.168.1.50.nip.io
+# Another registrable domain than DEMO_DOMAIN's, which plain HTTP requires: hence the other service.
+DEMO_SITE_DOMAIN=192.168.1.50.sslip.io
+DEMO_TLS_CERT=
+DEMO_TLS_KEY=
+DEMO_HTTP_PORT=80
+DEMO_BIND=0.0.0.0
+```
+
+The addresses are then http://192.168.1.50.nip.io, http://app.192.168.1.50.nip.io and so on
+(`make urls`). The clients need the internet to resolve them, and some routers drop public DNS
+answers that point at a private address (DNS rebinding protection). Without either, use made-up
+names (`DEMO_DOMAIN=demo.lan`, `DEMO_SITE_DOMAIN=sites.lan`) and add `make hosts
+ADDR=192.168.1.50`'s lines to `/etc/hosts` on every client. A hosts file has no wildcards, so a
+website made in the CMS studio later needs a line of its own.
+
+Under these names:
+
+- The demo is published beyond the server (`DEMO_BIND` not a loopback address), so it closes what
+  [HTTPS on a domain](#https-on-a-domain) lists: the mail viewer, Prometheus and Grafana ask for
+  the admin's sign-in, and `make verify` skips its chat turn.
+- Plain HTTP on a name other than localhost is not a secure context. The products' sign-in cookies
+  are Secure only over HTTPS, so sign-in works, but pacod-ap's chat page calls `crypto.randomUUID()`,
+  which browsers offer only in a secure context: expect it to fail there. The tunnel avoids that; so does
+  Chrome's `chrome://flags/#unsafely-treat-insecure-origin-as-secure` with the app's address.
+- A stack that already has data under another domain needs `make clean` first: the bootstrap
+  registered every address with the old one (demo.env.example).
+- The server's firewall must let the port through.
 
 ### Google Search and Analytics
 
