@@ -148,9 +148,19 @@ if [ -n "$cert$key" ]; then
 		ok "certificate certs/$cert"
 	fi
 	# The one certificate serves every site: the stack's (*.DEMO_DOMAIN) and the websites'
-	# (*.DEMO_SITE_DOMAIN).
+	# (*.DEMO_SITE_DOMAIN), those only with the CMS (DEMO_PRODUCTS: no other product brings it, so
+	# it runs when the list is empty or names it or all).
+	cms_runs=false
+	for name in $(printf %s "${DEMO_PRODUCTS:-all}" | tr '[:upper:],' '[:lower:] '); do
+		case ${name#pacod-} in all | cms) cms_runs=true ;; esac
+	done
+	if [ "$cms_runs" = true ]; then
+		hosts="${DEMO_STUDIO_SUBDOMAIN:-studio}.$DEMO_DOMAIN ${DEMO_CMS_SUBDOMAIN:-cms}.${DEMO_SITE_DOMAIN:-$DEMO_DOMAIN}"
+	else
+		hosts="id.$DEMO_DOMAIN"
+	fi
 	if [ -f "certs/$cert" ] && command -v openssl >/dev/null; then
-		for h in "${DEMO_STUDIO_SUBDOMAIN:-studio}.$DEMO_DOMAIN" "${DEMO_CMS_SUBDOMAIN:-cms}.${DEMO_SITE_DOMAIN:-$DEMO_DOMAIN}"; do
+		for h in $hosts; do
 			openssl x509 -noout -checkhost "$h" -in "certs/$cert" 2>/dev/null | grep -q 'does match' ||
 				warn "certs/$cert does not cover $h: browsers refuse it there (certs/README.md)"
 		done
