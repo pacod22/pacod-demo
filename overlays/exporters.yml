@@ -4,9 +4,13 @@
 services:
   pacod-postgres-exporter:
     ports: !reset []
+  # The app's two only while pacod-ap runs (demo.env's DEMO_PRODUCTS: scripts/render-env.sh turns
+  # the profile ap on): without its pgbouncer the first one exits, and restarts for ever.
   ap-pgbouncer-exporter:
+    profiles: [ap]
     ports: !reset []
   ap-redis-exporter:
+    profiles: [ap]
     ports: !reset []
   pacod-node-exporter:
     ports: !reset []

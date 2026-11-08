@@ -20,6 +20,16 @@ cd "$(dirname "$0")/.."
 offer=$(sed -n 's/^AP_BROKER_OFFER=//p' .state/env/stack.env)
 summary="The help desk of Nimbus Notes, a note-taking service: plans, sync, sharing and billing."
 
+# Both must run (demo.env's DEMO_PRODUCTS). Without the broker the offer is left as it is rather
+# than withdrawn: each change publishes a release of the starter.
+products=" $(cat .state/products 2>/dev/null || echo ap broker) "
+case $products in *" ap "*) ;; *) exit 0 ;; esac
+case $products in
+	*" broker "*) ;;
+	*) echo "broker-offer: pacod-broker does not run (DEMO_PRODUCTS); the starter's offer is left as it is"
+		exit 0 ;;
+esac
+
 if ! docker ps --format '{{.Names}}' | grep -qx ap-api; then
 	echo "broker-offer: ap-api is not running; the starter's offer on pacod-broker is left as it is"
 	exit 0

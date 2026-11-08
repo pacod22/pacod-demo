@@ -4,6 +4,10 @@
 	when it is the scheme's default). */ -}}
 {{- $d := env "DEMO_DOMAIN" }}{{ $studio := env "CMS_STUDIO_HOST" }}{{ $cms := env "CMS_DEMO_HOST" }}{{ $minimal := env "CMS_MINIMAL_HOST" }}{{ $space := env "CMS_SPACE_HOST" }}{{ $s := env "DEMO_URL_SCHEME" }}{{ $p := "" }}{{ with env "DEMO_URL_PORT" }}{{ $p = printf ":%s" . }}{{ end }}
 {{- $email := env "DEMO_ADMIN_EMAIL" }}{{ $public := eq (env "DEMO_PUBLIC") "true" }}
+{{- /* The products that run (demo.env's DEMO_PRODUCTS, which always names id): only those are
+	shown, each tested as `contains ",gw," $on`; the flagships' section only with one of them. */ -}}
+{{- $on := printf ",%s," (env "DEMO_PRODUCTS" | default "id,gw,ap,cms,kb,bench,broker,agg") }}
+{{- $flagships := or (contains ",gw," $on) (contains ",cms," $on) (contains ",ap," $on) }}
 {{- /* The nightly reset (the Makefile's scheduler): on only with a time and a baseline. */ -}}
 {{- $reset := eq (env "DEMO_RESET") "true" }}{{ $resetAt := env "DEMO_RESET_TIME" }}{{ $resetTz := env "DEMO_RESET_TIMEZONE" }}
 {{- /* Google (demo.env): a GA4 measurement id (G-...) or a Tag Manager container (GTM-...), and the
@@ -408,39 +412,39 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 		</figure>
 	</div>
 
-	<div class="wrap flagships" aria-label="The flagship products">
-		<a class="flag gw" href="#pacod-gw">
+	{{if $flagships}}<div class="wrap flagships" aria-label="The flagship products">
+		{{if contains ",gw," $on}}<a class="flag gw" href="#pacod-gw">
 			<span class="head"><span class="badge">GW</span><strong>pacod-gw</strong></span>
 			<span class="kind">AI gateway</span>
 			<span class="what">Fast, scalable and flexible, with every call monitored and a console that is easy to use.</span>
-		</a>
-		<a class="flag" href="#pacod-cms">
+		</a>{{end}}
+		{{if contains ",cms," $on}}<a class="flag" href="#pacod-cms">
 			<span class="head"><span class="badge">CM</span><strong>pacod-cms</strong></span>
 			<span class="kind">Content management</span>
 			<span class="what">Flexible and easy to use, with AI to write, translate and make PDFs.</span>
-		</a>
-		<a class="flag" href="#pacod-ap">
+		</a>{{end}}
+		{{if contains ",ap," $on}}<a class="flag" href="#pacod-ap">
 			<span class="head"><span class="badge">AP</span><strong>pacod-ap</strong></span>
 			<span class="kind">Agent builder</span>
 			<span class="what">Build AI agents visually, with full control over models, tools, prompts and releases.</span>
-		</a>
-	</div>
+		</a>{{end}}
+	</div>{{end}}
 
 	<div class="wrap jump" aria-label="Also in the stack">
 		<span class="label">Also in the stack</span>
 		<a class="id" href="#pacod-id"><span class="badge">ID</span>pacod-id</a>
-		<a href="#pacod-kb"><span class="badge">KB</span>pacod-kb</a>
-		<a href="#pacod-benchmark"><span class="badge">BM</span>pacod-benchmark</a>
-		<a href="#pacod-broker"><span class="badge">BR</span>pacod-broker</a>
-		<a href="#pacod-aggregator"><span class="badge">AG</span>pacod-aggregator</a>
+		{{if contains ",kb," $on}}<a href="#pacod-kb"><span class="badge">KB</span>pacod-kb</a>{{end}}
+		{{if contains ",bench," $on}}<a href="#pacod-benchmark"><span class="badge">BM</span>pacod-benchmark</a>{{end}}
+		{{if contains ",broker," $on}}<a href="#pacod-broker"><span class="badge">BR</span>pacod-broker</a>{{end}}
+		{{if contains ",agg," $on}}<a href="#pacod-aggregator"><span class="badge">AG</span>pacod-aggregator</a>{{end}}
 	</div>
 
-	<section class="section" id="products">
+	{{if $flagships}}<section class="section" id="products">
 		<div class="wrap">
 			<h2>The flagship products</h2>
 			<p class="sub">Each is a complete product with its own repository. Here they share one network, one database server and one sign-in.</p>
 
-			<!-- pacod-gw -->
+			{{if contains ",gw," $on}}<!-- pacod-gw -->
 			<article class="product gw" id="pacod-gw">
 				<div>
 					<div class="head"><span class="badge">GW</span><h3>pacod-gw</h3></div>
@@ -473,9 +477,9 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 					<li><strong>Tools and agents</strong><span>MCP servers an organisation registers are probed, and each tool's definition is approved and pinned: a server that changes a description later has it held until it is approved again. A key's bundles decide which tools it sees on one governed <code>/mcp</code>, in the 2026-07-28 and 2025 revisions of MCP. Every tool call is recorded, and limits count tool calls. Agents are registered too, each with its own models, tools, limits and a kill switch. Remote A2A agents are reached through the gateway with their tasks kept apart per workspace. These are in the full gateway; lite serves models only.</span></li>
 					<li><strong>Usability</strong><span>One console for models, templates, keys, versioned prices, quotas and reports, down to what the response cache saved. Changes take effect live, without a restart. A built-in tester runs test cases and load tests against the gateway.</span></li>
 				</ul>
-			</article>
+			</article>{{end}}
 
-			<!-- pacod-cms -->
+			{{if contains ",cms," $on}}<!-- pacod-cms -->
 			<article class="product" id="pacod-cms">
 				<div>
 					<div class="head"><span class="badge">CM</span><h3>pacod-cms</h3></div>
@@ -521,9 +525,9 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 					<li><strong>Many websites, one studio</strong><span>Organisations, websites, members and roles per website, in a studio available in English, Bulgarian, German and Russian. Each website is isolated in its own database, folder and cache, at its own domains.</span></li>
 					<li><strong>Advertising and statistics</strong><span>Ad bookings with an HTML5 banner builder, with served, viewable and clicked counts. Reader statistics without cookies, a crawler log that verifies Googlebot, and a link-in-bio page.</span></li>
 				</ul>
-			</article>
+			</article>{{end}}
 
-			<!-- pacod-ap -->
+			{{if contains ",ap," $on}}<!-- pacod-ap -->
 			<article class="product" id="pacod-ap">
 				<div>
 					<div class="head"><span class="badge">AP</span><h3>pacod-ap</h3></div>
@@ -560,9 +564,9 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 					<li><strong>Grounded answers</strong><span>Every agent has its own knowledge base and curated knowledge, reference facts and MCP tools, and answers from them. Each agent's knowledge, conversations and settings stay its own.</span></li>
 					<li><strong>Improves continuously</strong><span>A review loop finds failed answers in recent conversations and proposes fixes: knowledge, facts and test cases. By default, a person approves them before they reach the live agent. Every model call is costed by the gateway.</span></li>
 				</ul>
-			</article>
+			</article>{{end}}
 		</div>
-	</section>
+	</section>{{end}}
 
 	<section class="section" id="foundation">
 		<div class="wrap">
@@ -593,7 +597,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 					</div>
 				</article>
 
-				<!-- pacod-kb -->
+				{{if contains ",kb," $on}}<!-- pacod-kb -->
 				<article class="product compact" id="pacod-kb">
 					<div>
 						<div class="head"><span class="badge">KB</span><h3>pacod-kb</h3></div>
@@ -614,10 +618,10 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 							<img src="screenshots/kb.png" width="1280" height="800" loading="lazy" alt="The knowledge base's home: dashboard, ingest, search, documents and Qdrant">
 						</a>
 					</div>
-				</article>
+				</article>{{end}}
 			</div>
 
-			<!-- pacod-benchmark -->
+			{{if contains ",bench," $on}}<!-- pacod-benchmark -->
 			<article class="product" id="pacod-benchmark">
 				<div>
 					<div class="head"><span class="badge">BM</span><h3>pacod-benchmark</h3></div>
@@ -639,9 +643,9 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 						<img src="screenshots/bench.png" width="1280" height="800" loading="lazy" alt="pacod-benchmark's dashboard: the latest runs and the load agents">
 					</a>
 				</div>
-			</article>
+			</article>{{end}}
 
-			<!-- pacod-broker -->
+			{{if contains ",broker," $on}}<!-- pacod-broker -->
 			<article class="product" id="pacod-broker">
 				<div>
 					<div class="head"><span class="badge">BR</span><h3>pacod-broker</h3></div>
@@ -664,9 +668,9 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 						<img src="screenshots/broker.png" width="1280" height="800" loading="lazy" alt="pacod-broker's console: the resources on the broker, with their kind, provider, status and price now">
 					</a>
 				</div>
-			</article>
+			</article>{{end}}
 
-			<!-- pacod-aggregator -->
+			{{if contains ",agg," $on}}<!-- pacod-aggregator -->
 			<article class="product" id="pacod-aggregator">
 				<div>
 					<div class="head"><span class="badge">AG</span><h3>pacod-aggregator</h3></div>
@@ -688,7 +692,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 						<img src="screenshots/aggregator.png" width="1280" height="800" loading="lazy" alt="pacod-aggregator's console: the catalogue, with each model's vendor, status, context window and prices">
 					</a>
 				</div>
-			</article>
+			</article>{{end}}
 		</div>
 	</section>
 

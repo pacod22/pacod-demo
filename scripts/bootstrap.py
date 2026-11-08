@@ -53,6 +53,12 @@ products already ship, pointed at the demo's files instead of a checkout's.
    one an MCP client of the gateway's /mcp uses. No family service speaks A2A yet, so the
    gateway's A2A proxy has no remote agent here.
 
+Only the products that run are bootstrapped (demo.env's DEMO_PRODUCTS, which scripts/render-env.sh
+resolves into DEMO_PRODUCTS and DEMO_ADMIN_ROLES of stack.env): without pacod-gw, steps 1, 2, 5, 6,
+8 and 9 are left out, and the aggregator's token for the gateway; without pacod-broker, 6 and 7; a
+product's own step, account or token is made only while it runs. The gateway keys of step 1 are
+made for every product all the same, so a product added later finds its key there.
+
 Every step keeps what still works, so a second run changes nothing. All results go to
 /state/bootstrap.env; nothing secret is printed. scripts/render-env.sh then hands them to the
 services, and `make up` recreates the ones whose settings changed.
@@ -126,6 +132,15 @@ if hasattr(gw, "KEY_AGENTS"):
     gw.KEY_AGENTS.update({name: [name] for name, _, _ in PRODUCT_AGENTS})
 
 ISSUER = os.environ["PACOD_ID_ISSUER"]
+# The products that run, by their overlays' names (render-env.sh); every one in an env file
+# rendered before DEMO_PRODUCTS.
+PRODUCTS = set(os.environ.get("DEMO_PRODUCTS", "id,gw,ap,cms,kb,bench,broker,agg").split(","))
+
+
+def product_runs(product: str) -> bool:
+    return product in PRODUCTS
+
+
 # The management API listens on pacod-admin-net alone, under this alias.
 ADMIN_URL = "http://pacod-gw-admin:8081"
 DATA_URL = "http://pacod-gw:8080"
@@ -262,9 +277,13 @@ class IdSession:
 
 
 def admin_roles() -> None:
-    # The roles pacod-id was told to give, from the file it reads them from. Added as the admin
-    # itself, whose id.admin may give any role; none is ever taken away.
-    roles = gw.read_env(STATE / "env" / "id.env").get("PID_BOOTSTRAP_ADMIN_ROLES", "")
+    # The roles pacod-id was told to give, of the products that run (render-env.sh's
+    # DEMO_ADMIN_ROLES; one that does not run pushes no roles to pacod-id, which would be waited
+    # for), else all from the file pacod-id reads them from. Added as the admin itself, whose
+    # id.admin may give any role; none is ever taken away.
+    roles = os.environ.get("DEMO_ADMIN_ROLES")
+    if roles is None:
+        roles = gw.read_env(STATE / "env" / "id.env").get("PID_BOOTSTRAP_ADMIN_ROLES", "")
     wanted = [r for r in roles.split(",") if r]
     ident = gw.read_env(gw.ID_ENV)
     session = IdSession(ident["PID_BOOTSTRAP_ADMIN_EMAIL"], ident["PID_BOOTSTRAP_ADMIN_PASSWORD"])
@@ -348,14 +367,16 @@ def broker_takes(token: str | None) -> bool:
     return status != 401
 
 
-def broker(api: gw.Api) -> None:
-    have = gw.read_env(OUT)
-    # The bridge reads the platform as broker_bridge (calls with tickets included), no more.
-    token = have.get("GWB_GW_TOKEN")
-    if not token or gw.refused(gw.probe("GET", f"{api.base}/orgs", token)):
-        token = gw.make_admin_token(api, "pacod-gw-broker", "broker_bridge", {"type": "platform"})
-        gw.write_env(OUT, {"GWB_GW_TOKEN": token})
-        say("broker: made GWB_GW_TOKEN (broker_bridge)")
+def broker(api: gw.Api | None) -> None:
+    """The accounts and tokens of step 6 and 7, for the products that run: the gateway's (`api`,
+    None without pacod-gw), pacod-ap's, the CMS's and pacod-kb's."""
+    if api is not None:
+        # The bridge reads the platform as broker_bridge (calls with tickets included), no more.
+        token = gw.read_env(OUT).get("GWB_GW_TOKEN")
+        if not token or gw.refused(gw.probe("GET", f"{api.base}/orgs", token)):
+            token = gw.make_admin_token(api, "pacod-gw-broker", "broker_bridge", {"type": "platform"})
+            gw.write_env(OUT, {"GWB_GW_TOKEN": token})
+            say("broker: made GWB_GW_TOKEN (broker_bridge)")
 
     ident = gw.read_env(gw.ID_ENV)
     session = None
@@ -372,29 +393,33 @@ def broker(api: gw.Api) -> None:
         say(f"broker: made {var} ({', '.join(r for r, _ in bindings)})")
         return True
 
-    mint("GWB_CONSUMER_TOKEN", f"{BROKER_ACCOUNT} bridge",
-         [("broker.consumer", "platform"), ("broker.witness", "platform")])
-    mint("PGW_BROKER_TOKEN", f"{BROKER_ACCOUNT} core", [("broker.consumer", "platform")])
+    if api is not None:
+        mint("GWB_CONSUMER_TOKEN", f"{BROKER_ACCOUNT} bridge",
+             [("broker.consumer", "platform"), ("broker.witness", "platform")])
+        mint("PGW_BROKER_TOKEN", f"{BROKER_ACCOUNT} core", [("broker.consumer", "platform")])
 
-    # One provider account per organisation of the gateway, so that each announces as itself
-    # and its own members' calls never count towards its reputation (docs/reputation.md).
-    orgs = []
-    for org in api.items("/orgs"):
-        var = "GWB_ORG_TOKEN_" + "".join(c if c.isalnum() else "_" for c in org["name"]).upper()
-        if mint(var, f"{BROKER_ACCOUNT} {org['name']}", [("broker.provider", f"organisation:{org['id']}")]):
-            orgs.append((org["name"], var))
-    write_bridge_file(orgs)
+        # One provider account per organisation of the gateway, so that each announces as itself
+        # and its own members' calls never count towards its reputation (docs/reputation.md).
+        orgs = []
+        for org in api.items("/orgs"):
+            var = "GWB_ORG_TOKEN_" + "".join(c if c.isalnum() else "_" for c in org["name"]).upper()
+            if mint(var, f"{BROKER_ACCOUNT} {org['name']}", [("broker.provider", f"organisation:{org['id']}")]):
+                orgs.append((org["name"], var))
+        write_bridge_file(orgs)
 
     # pacod-ap is one installation: one account announces its agents and searches the broker.
-    mint("BROKER_AP_TOKEN", "pacod-demo ap broker",
-         [("broker.consumer", "platform"), ("broker.provider", "platform")])
+    if product_runs("ap"):
+        mint("BROKER_AP_TOKEN", "pacod-demo ap broker",
+             [("broker.consumer", "platform"), ("broker.provider", "platform")])
     # The CMS studio reads with this one; each organisation announces with its own, which the
     # studio's provisioner makes (pacod-cms's BrokerProviders), hence broker.provisioner.
-    mint("CMS_BROKER_TOKEN", "pacod-demo cms broker", [("broker.consumer", "platform")])
+    if product_runs("cms"):
+        mint("CMS_BROKER_TOKEN", "pacod-demo cms broker", [("broker.consumer", "platform")])
     # pacod-kb only reads the broker (its Broker page), so its own account holds broker.consumer.
-    mint("KB_BROKER_TOKEN", "pacod-demo kb broker", [("broker.consumer", "platform")])
+    if product_runs("kb"):
+        mint("KB_BROKER_TOKEN", "pacod-demo kb broker", [("broker.consumer", "platform")])
     provisioner = gw.read_env(OUT).get("PACOD_ID_PROVISIONER_ACCOUNT")
-    if provisioner:
+    if provisioner and product_runs("cms"):
         session = session or IdSession(ident["PID_BOOTSTRAP_ADMIN_EMAIL"], ident["PID_BOOTSTRAP_ADMIN_PASSWORD"])
         bind_platform_role(session, provisioner, "broker.provisioner")
 
@@ -705,16 +730,34 @@ def tools() -> None:
 def main() -> None:
     OUT.touch(mode=0o600, exist_ok=True)
     if sys.argv[1:] == ["tools"]:
-        tools()
+        # pacod-ap runs only with pacod-gw (render-env.sh).
+        if product_runs("ap"):
+            tools()
+        else:
+            say("tools: pacod-ap does not run (DEMO_PRODUCTS): no tool server")
         return
-    api = gateway()
-    bench(api)
-    cms_provisioner()
+    left_out = [p for p in ("gw", "ap", "cms", "kb", "bench", "broker", "agg") if not product_runs(p)]
+    if left_out:
+        say(f"the products that run: {', '.join(sorted(PRODUCTS))} (DEMO_PRODUCTS); not {', '.join(left_out)}")
+    api = gateway() if product_runs("gw") else None
+    if product_runs("bench"):
+        bench(api)
+    if product_runs("cms"):
+        cms_provisioner()
     admin_roles()
-    cms_gateway_key()
-    broker(api)
-    aggregator()
-    model_data(api)
+    if product_runs("cms"):
+        if api is not None:
+            cms_gateway_key()
+        else:
+            say("cms: pacod-gw does not run (DEMO_PRODUCTS): the studio's AI features have no gateway")
+    if product_runs("broker"):
+        broker(api)
+    # The gateway's core reads the aggregator's catalogue (aggregator) and syncs its models' data
+    # from it (model_data).
+    if api is not None and product_runs("agg"):
+        aggregator()
+    if api is not None:
+        model_data(api)
     say(f"done; credentials in .state/{OUT.name}")
 
 

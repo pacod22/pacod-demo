@@ -2,29 +2,31 @@
 	domain, scheme and port, and the CMS's hosts. The llms.txt format (llmstxt.org): what the
 	demo is, for a language model, with the links to read further. It never names the admin. */ -}}
 {{- $d := env "DEMO_DOMAIN" }}{{ $studio := env "CMS_STUDIO_HOST" }}{{ $cms := env "CMS_DEMO_HOST" }}{{ $minimal := env "CMS_MINIMAL_HOST" }}{{ $space := env "CMS_SPACE_HOST" }}{{ $s := env "DEMO_URL_SCHEME" }}{{ $p := "" }}{{ with env "DEMO_URL_PORT" }}{{ $p = printf ":%s" . }}{{ end }}
-{{- $public := eq (env "DEMO_PUBLIC") "true" }}{{ $reset := eq (env "DEMO_RESET") "true" -}}
+{{- $public := eq (env "DEMO_PUBLIC") "true" }}{{ $reset := eq (env "DEMO_RESET") "true" }}
+{{- /* The products that run (demo.env's DEMO_PRODUCTS): only those are listed. */ -}}
+{{- $all := "id,gw,ap,cms,kb,bench,broker,agg" }}{{ $products := env "DEMO_PRODUCTS" | default $all }}{{ $on := printf ",%s," $products -}}
 # pacod demo
 
-> pacod, open source: a high-performance AI gateway (pacod-gw), an AI-assisted CMS (pacod-cms) and an easy agent builder (pacod-ap), working as one platform with one sign-in (pacod-id), beside a RAG knowledge base (pacod-kb), the gateway's benchmarks (pacod-benchmark) and a discovery broker (pacod-broker). This demo runs all of them together on one machine.
+> pacod, open source: a high-performance AI gateway (pacod-gw), an AI-assisted CMS (pacod-cms) and an easy agent builder (pacod-ap), working as one platform with one sign-in (pacod-id), beside a RAG knowledge base (pacod-kb), the gateway's benchmarks (pacod-benchmark) and a discovery broker (pacod-broker). This demo runs {{if eq $products $all}}all of them{{else}}those listed below{{end}} together on one machine.
 
 Every person signs in through pacod-id; every model call goes through pacod-gw, so the products on top never hold a provider's key. Each product is a complete product with its own repository; here they share one network, one database server and one sign-in.{{if $reset}} The demo is reset every night at {{env "DEMO_RESET_TIME"}} {{env "DEMO_RESET_TIMEZONE"}}: every change made to it is undone.{{end}}
 
 ## Products
 
-- [pacod-gw, the gateway console]({{$s}}://console.{{$d}}{{$p}}/): a high-performance gateway between applications and every LLM provider. A Rust core relays or translates every call (OpenAI, Anthropic and Gemini dialects), keeps provider keys out of the apps, routes across model pools, enforces quotas and prices each request; a SvelteKit console manages it. It also governs agents' tools: approved tools of the MCP servers an organisation registers, served on one /mcp to the keys their bundles grant, registered agents with a kill switch, and an A2A proxy (full gateway only).
-- [pacod-gw, the OpenAI-compatible API]({{$s}}://gw.{{$d}}{{$p}}/v1): the gateway's data plane; it needs a gateway key.
-- [pacod-gw, MCP]({{$s}}://gw.{{$d}}{{$p}}/mcp): the gateway's governed MCP server (POST, JSON-RPC); with a key whose tool bundles grant them, it serves pacod-ap's tools (pacod-ap__list_agents, pacod-ap__list_facts, pacod-ap__get_fact) and pacod-broker's discovery tools.
-- [pacod-cms, the studio]({{$s}}://{{$studio}}{{$p}}/): a multi-website CMS with AI-assisted content generation, translation and PDF creation, template sets, advertising and statistics. Java 25, Spring Boot, MongoDB.
-- [Demo Journal]({{$s}}://{{$cms}}{{$p}}/): a CMS demo website on the editorial template set.
-- [Demo Notes]({{$s}}://{{$minimal}}{{$p}}/): a CMS demo website on the minimal template set.
-- [Starward]({{$s}}://{{$space}}{{$p}}/): an image-led space-travel magazine for an invented star system, on the magazine template set, with NASA photographs and animated HTML5 advertising.
-- [pacod-ap, the agent platform]({{$s}}://app.{{$d}}{{$p}}/): build AI agents with full control over their knowledge, models, tools and directives, a visual editor, versioned releases and a review loop. The demo runs the "starter" agent, a small fictional help desk; its [chat]({{$s}}://app.{{$d}}{{$p}}/chat) and [admin console]({{$s}}://app.{{$d}}{{$p}}/dashboard).
-- [pacod-id, identity administration]({{$s}}://id.{{$d}}{{$p}}/admin): one sign-in for people and machines; an OpenID Connect provider with accounts, organisations and role bindings ([discovery]({{$s}}://id.{{$d}}{{$p}}/.well-known/openid-configuration)).
-- [pacod-kb, the knowledge base]({{$s}}://kb.{{$d}}{{$p}}/kb): ingests files and web pages, converts them to Markdown and indexes them for hybrid semantic and keyword search.
-- [pacod-benchmark]({{$s}}://bench.{{$d}}{{$p}}/): measures pacod-gw and other gateways over a matrix of settings; reports are published to the gateway console.
-- [pacod-broker]({{$s}}://broker.{{$d}}{{$p}}/): a catalogue of models, MCP servers, agents and compute with prices, availability and reputation; its public API is at {{$s}}://broker-api.{{$d}}{{$p}}/v1 (POST /v1/discover, and MCP at /mcp).
-- [pacod-aggregator]({{$s}}://agg.{{$d}}{{$p}}/): which LLM models each vendor offers, what they can do, which parameters they take and what they cost, read from the vendors' own pages; pacod-gw takes it once a day.
-
+{{if contains ",gw," $on}}- [pacod-gw, the gateway console]({{$s}}://console.{{$d}}{{$p}}/): a high-performance gateway between applications and every LLM provider. A Rust core relays or translates every call (OpenAI, Anthropic and Gemini dialects), keeps provider keys out of the apps, routes across model pools, enforces quotas and prices each request; a SvelteKit console manages it. It also governs agents' tools: approved tools of the MCP servers an organisation registers, served on one /mcp to the keys their bundles grant, registered agents with a kill switch, and an A2A proxy (full gateway only).
+{{end}}{{if contains ",gw," $on}}- [pacod-gw, the OpenAI-compatible API]({{$s}}://gw.{{$d}}{{$p}}/v1): the gateway's data plane; it needs a gateway key.
+{{end}}{{if contains ",gw," $on}}- [pacod-gw, MCP]({{$s}}://gw.{{$d}}{{$p}}/mcp): the gateway's governed MCP server (POST, JSON-RPC); with a key whose tool bundles grant them, it serves pacod-ap's tools (pacod-ap__list_agents, pacod-ap__list_facts, pacod-ap__get_fact) and pacod-broker's discovery tools.
+{{end}}{{if contains ",cms," $on}}- [pacod-cms, the studio]({{$s}}://{{$studio}}{{$p}}/): a multi-website CMS with AI-assisted content generation, translation and PDF creation, template sets, advertising and statistics. Java 25, Spring Boot, MongoDB.
+{{end}}{{if contains ",cms," $on}}- [Demo Journal]({{$s}}://{{$cms}}{{$p}}/): a CMS demo website on the editorial template set.
+{{end}}{{if contains ",cms," $on}}- [Demo Notes]({{$s}}://{{$minimal}}{{$p}}/): a CMS demo website on the minimal template set.
+{{end}}{{if contains ",cms," $on}}- [Starward]({{$s}}://{{$space}}{{$p}}/): an image-led space-travel magazine for an invented star system, on the magazine template set, with NASA photographs and animated HTML5 advertising.
+{{end}}{{if contains ",ap," $on}}- [pacod-ap, the agent platform]({{$s}}://app.{{$d}}{{$p}}/): build AI agents with full control over their knowledge, models, tools and directives, a visual editor, versioned releases and a review loop. The demo runs the "starter" agent, a small fictional help desk; its [chat]({{$s}}://app.{{$d}}{{$p}}/chat) and [admin console]({{$s}}://app.{{$d}}{{$p}}/dashboard).
+{{end}}- [pacod-id, identity administration]({{$s}}://id.{{$d}}{{$p}}/admin): one sign-in for people and machines; an OpenID Connect provider with accounts, organisations and role bindings ([discovery]({{$s}}://id.{{$d}}{{$p}}/.well-known/openid-configuration)).
+{{if contains ",kb," $on}}- [pacod-kb, the knowledge base]({{$s}}://kb.{{$d}}{{$p}}/kb): ingests files and web pages, converts them to Markdown and indexes them for hybrid semantic and keyword search.
+{{end}}{{if contains ",bench," $on}}- [pacod-benchmark]({{$s}}://bench.{{$d}}{{$p}}/): measures pacod-gw and other gateways over a matrix of settings; reports are published to the gateway console.
+{{end}}{{if contains ",broker," $on}}- [pacod-broker]({{$s}}://broker.{{$d}}{{$p}}/): a catalogue of models, MCP servers, agents and compute with prices, availability and reputation; its public API is at {{$s}}://broker-api.{{$d}}{{$p}}/v1 (POST /v1/discover, and MCP at /mcp).
+{{end}}{{if contains ",agg," $on}}- [pacod-aggregator]({{$s}}://agg.{{$d}}{{$p}}/): which LLM models each vendor offers, what they can do, which parameters they take and what they cost, read from the vendors' own pages; pacod-gw takes it once a day.
+{{end}}
 ## Platform
 
 - [Grafana]({{$s}}://grafana.{{$d}}{{$p}}/): the dashboards of every product{{if $public}}; asks for the admin's email and password{{end}}.

@@ -24,20 +24,22 @@ OUT = Path("/work/home/screenshots")
 DOMAIN = E["DEMO_DOMAIN"]
 SITE_DOMAIN = E["DEMO_SITE_DOMAIN"]
 
-# (file name, address): what the home page shows for each product.
+# (product, file name, address): what the home page shows for each product.
 SHOTS = [
-    ("id-admin", E["PACOD_ID_ISSUER"] + "/admin"),
-    ("gw-console", E["GW_CONSOLE_ORIGIN"] + "/"),
-    ("ap-dashboard", E["AP_ORIGIN"] + "/dashboard"),
-    ("ap-site", E["AP_ORIGIN"] + "/"),
-    ("cms-studio", E["CMS_STUDIO_ORIGIN"] + "/mgmt/sites"),
-    ("cms-site", E["CMS_DEMO_ORIGIN"] + "/"),
-    ("cms-space", E["CMS_SPACE_ORIGIN"] + "/"),
-    ("kb", E["KB_ORIGIN"] + "/kb"),
-    ("bench", E["BENCH_ORIGIN"] + "/"),
-    ("broker", E["BROKER_ORIGIN"] + "/catalogue"),
-    ("aggregator", E["AGG_CONSOLE_URL"] + "/catalogue"),
+    ("id", "id-admin", E["PACOD_ID_ISSUER"] + "/admin"),
+    ("gw", "gw-console", E["GW_CONSOLE_ORIGIN"] + "/"),
+    ("ap", "ap-dashboard", E["AP_ORIGIN"] + "/dashboard"),
+    ("ap", "ap-site", E["AP_ORIGIN"] + "/"),
+    ("cms", "cms-studio", E["CMS_STUDIO_ORIGIN"] + "/mgmt/sites"),
+    ("cms", "cms-site", E["CMS_DEMO_ORIGIN"] + "/"),
+    ("cms", "cms-space", E["CMS_SPACE_ORIGIN"] + "/"),
+    ("kb", "kb", E["KB_ORIGIN"] + "/kb"),
+    ("bench", "bench", E["BENCH_ORIGIN"] + "/"),
+    ("broker", "broker", E["BROKER_ORIGIN"] + "/catalogue"),
+    ("agg", "aggregator", E["AGG_CONSOLE_URL"] + "/catalogue"),
 ]
+# Only of the products that run (demo.env's DEMO_PRODUCTS); the others' screenshots stay as they are.
+PRODUCTS = set(E.get("DEMO_PRODUCTS", "id,gw,ap,cms,kb,bench,broker,agg").split(","))
 
 
 def settle(page: Page) -> None:
@@ -85,7 +87,10 @@ def main() -> None:
         )
         page = context.new_page()
         sign_in(page)
-        for name, url in SHOTS:
+        for product, name, url in SHOTS:
+            if product not in PRODUCTS:
+                print(f"  {name:14} kept: {product} does not run (DEMO_PRODUCTS)", flush=True)
+                continue
             visit(page, url)
             if "/login" in page.url:
                 sys.exit(f"shots: {name} still asks for a sign-in ({page.url})")

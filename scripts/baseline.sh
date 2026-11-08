@@ -30,10 +30,13 @@ EDGE=pacod-caddy
 say() { echo "baseline: $*"; }
 die() { echo "baseline: $*" >&2; exit 1; }
 
-# The Makefile's COMPOSE.
+# The Makefile's COMPOSE: the products that run (DEMO_PRODUCTS). The volumes of the others are
+# copied and restored all the same, while nothing uses them.
 compose() {
+	file=$state/compose.yml
+	[ -f "$file" ] || file=compose.yml
 	COMPOSE_PROFILES=$(cat "$state/profiles" 2>/dev/null || echo ui) \
-		docker compose --project-directory . -f compose.yml "$@"
+		docker compose --project-directory . -f "$file" "$@"
 }
 
 copied() {

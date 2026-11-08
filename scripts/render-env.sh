@@ -10,6 +10,8 @@
 #   .state/env/id.container.env    pacod-id's container environment (its config's ${...})
 #   .state/env/bootstrap-id.env    what pacod-ap's bootstrap scripts read as deploy/secrets/id.env
 #   .state/env/providers.env       the provider keys, read by the gateway bootstrap only
+#   .state/compose.yml             compose.yml with the products that run (DEMO_PRODUCTS),
+#                                  .state/products their names, .state/profiles compose's profiles
 #
 # Run by `make up` and `make bootstrap`; safe to run any time. Prints no secret.
 set -eu
@@ -282,6 +284,61 @@ case $broker_url in
 esac
 broker_url=${broker_url%/}
 
+# The products that run (demo.env's DEMO_PRODUCTS), by the names of their overlays: empty or `all`,
+# every one. pacod-id and the shared layer always run. A product brings what it cannot run without:
+# compose refuses a depends_on on a service the project lacks, even one with required: false, and
+# kb-pipeline depends on pacod-gw and on pacod-embeddings, which comes with pacod-ap, bench-api on
+# the gateway's load agent; pacod-ap makes every model call through the gateway.
+all_products="gw ap cms kb bench broker agg"
+products=
+# (Not $p: that is the HTTP port.)
+for name in $(printf %s "${DEMO_PRODUCTS:-all}" | tr '[:upper:],' '[:lower:] '); do
+	name=${name#pacod-}
+	case $name in
+		all) products=$all_products ;;
+		id) ;;
+		benchmark) products="$products bench" ;;
+		aggregator) products="$products agg" ;;
+		gw | ap | cms | kb | bench | broker | agg) products="$products $name" ;;
+		*) echo "render-env: DEMO_PRODUCTS (demo.env or demo.local.env) names $name, which is not a product: gw, ap, cms, kb, bench, broker," \
+			"agg (or pacod-gw, ..., pacod-benchmark, pacod-aggregator), all, or id, which always runs" >&2
+			exit 1 ;;
+	esac
+done
+runs() { case " $products " in *" $1 "*) ;; *) return 1 ;; esac; }
+also=
+needs() { # needs PRODUCT OTHER...: PRODUCT runs with the others only
+	product=$1
+	shift
+	runs "$product" || return 0
+	for other in "$@"; do
+		if ! runs "$other"; then
+			products="$products $other"
+			also="$also $other (for $product)"
+		fi
+	done
+}
+needs kb gw ap
+needs ap gw
+needs bench gw
+if [ -n "$also" ]; then echo "render-env: DEMO_PRODUCTS runs$also too"; fi
+# In the order of compose.yml, pacod-id first.
+selected=id
+for name in $all_products; do
+	if runs "$name"; then selected="$selected $name"; fi
+done
+# The admin's roles at pacod-id. PID_BOOTSTRAP_ADMIN_ROLES names every product's, given when the
+# account is made, and stays so: pacod-id is not recreated when the products change. Those of the
+# products that run are DEMO_ADMIN_ROLES, which the bootstrap gives an account that lacks one and
+# make verify checks; a product that does not run pushes no roles to pacod-id to give.
+all_roles=id.admin,pacod.superuser,pacod.admin,gw.platform_admin,cms.platform_admin,kb.admin,bench.admin,broker.admin,agg.admin
+admin_roles=
+for role in $(printf %s "$all_roles" | tr , ' '); do
+	owner=${role%%.*}
+	if [ "$owner" = pacod ]; then owner=ap; fi
+	if [ "$owner" = id ] || runs "$owner"; then admin_roles=${admin_roles:+$admin_roles,}$role; fi
+done
+
 # ---- every include ----------------------------------------------------------------------------
 {
 	cat <<EOF
@@ -303,6 +360,10 @@ DEMO_URL_PORT=$url_port
 DEMO_ORIGIN=$origin
 DEMO_ADMIN_EMAIL=$DEMO_ADMIN_EMAIL
 DEMO_ADMIN_PASSWORD=$admin_password
+# The products that run (DEMO_PRODUCTS, with what they need), pacod-id always, and the admin's
+# roles of those (scripts/bootstrap.py, make verify, the home page).
+DEMO_PRODUCTS=$(printf %s "$selected" | tr ' ' ,)
+DEMO_ADMIN_ROLES=$admin_roles
 DEMO_PROFILES=$DEMO_PROFILES
 EMBEDDINGS_BACKEND=$EMBEDDINGS_BACKEND
 TORCH_NUM_THREADS=$TORCH_NUM_THREADS
@@ -416,7 +477,7 @@ EOF
 cat > "$state/env/id.env" <<EOF
 PID_BOOTSTRAP_ADMIN_EMAIL=$DEMO_ADMIN_EMAIL
 PID_BOOTSTRAP_ADMIN_REALM=pacod
-PID_BOOTSTRAP_ADMIN_ROLES=id.admin,pacod.superuser,pacod.admin,gw.platform_admin,cms.platform_admin,kb.admin,bench.admin,broker.admin,agg.admin
+PID_BOOTSTRAP_ADMIN_ROLES=$all_roles
 PID_EMAIL_FROM_ADDRESS=id@$d
 PID_EMAIL_FROM_NAME=pacod (demo)
 PID_LOG=$log_level,sqlx=warn
@@ -615,11 +676,38 @@ EOF
 # Compose profiles: the app's frontend always; its CPU ingestion on request.
 profiles=ui
 case ",$DEMO_PROFILES," in *,ingestion,*) profiles="$profiles,cpu" ;; esac
-# pacod-gw's bridge to pacod-broker, once the bootstrap has made its tokens and its file.
-if [ -n "${GWB_GW_TOKEN:-}" ] && [ -f "$state/broker/gw-broker.yaml" ]; then
+# pacod-ap's exporters of its pgbouncer and Redis (overlays/exporters.yml), while it runs.
+if runs ap; then profiles="$profiles,ap"; fi
+# pacod-gw's bridge to pacod-broker, once the bootstrap has made its tokens and its file, and while
+# both run (overlays/gw.yml has it depend on pacod-broker).
+if runs gw && runs broker && [ -n "${GWB_GW_TOKEN:-}" ] && [ -f "$state/broker/gw-broker.yaml" ]; then
 	profiles="$profiles,broker"
 fi
 printf '%s\n' "$profiles" > "$state/profiles"
+
+# ---- the compose project: compose.yml without the products that do not run ---------------------
+# Its include blocks are apart by blank lines, and a block whose path list has overlays/<product>.yml
+# of a product that does not run is left out (compose.yml says so); the rest is copied as it is
+# (a comment may name another product's overlay). Its paths stay right: the Makefile runs compose
+# with pacod-demo as the project directory, which a relative path in a top-level file is read against.
+printf '%s\n' "$selected" > "$state/products"
+awk -v run=" $selected " '
+	BEGIN { RS = ""; ORS = "\n\n" }
+	NR == 1 { print "# Generated by scripts/render-env.sh: compose.yml with the products demo.env runs (DEMO_PRODUCTS).\n# Do not edit; edit compose.yml." }
+	{
+		product = ""
+		n = split($0, lines, "\n")
+		for (i = 1; i <= n && product == ""; i++) {
+			if (lines[i] ~ /^[ \t]*-[ \t]+overlays\/[a-z]+\.yml[ \t]*$/) {
+				product = lines[i]
+				sub(/^[ \t]*-[ \t]+overlays\//, "", product)
+				sub(/\.yml[ \t]*$/, "", product)
+			}
+		}
+		if (product != "" && product != "exporters" && index(run, " " product " ") == 0) next
+		print
+	}
+' compose.yml > "$state/compose.yml"
 
 # ---- the bootstrap (pacod-ap's scripts, run by scripts/bootstrap.py) ----------------------------
 cat > "$state/env/bootstrap-id.env" <<EOF
@@ -637,4 +725,8 @@ DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY
 GLM_API_KEY=$GLM_API_KEY
 EOF
 
-echo "render-env: wrote .state/env/ (issuer $(url id))"
+if [ "$selected" = "id $all_products" ]; then
+	echo "render-env: wrote .state/env/ (issuer $(url id))"
+else
+	echo "render-env: wrote .state/env/ (issuer $(url id); products: $selected)"
+fi
