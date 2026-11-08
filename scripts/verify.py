@@ -25,7 +25,15 @@ E = os.environ
 ISSUER = E["PACOD_ID_ISSUER"]
 # A demo published beyond this machine (render-env.sh): private sites, no dev tokens.
 PUBLIC = E.get("DEMO_PUBLIC") == "true"
+# The products that run (demo.env's DEMO_PRODUCTS, resolved by render-env.sh), by their overlays'
+# names; every one in an env file rendered before it. Only their checks run.
+ALL_PRODUCTS = ("gw", "ap", "cms", "kb", "bench", "broker", "agg")
+PRODUCTS = set(E.get("DEMO_PRODUCTS", ",".join(("id", *ALL_PRODUCTS))).split(","))
 fails = 0
+
+
+def product_runs(product: str | None) -> bool:
+    return product is None or product in PRODUCTS
 
 
 def report(ok: bool | None, name: str, detail: str = "") -> None:
@@ -101,18 +109,22 @@ def edge() -> None:
     status, disc = check("pacod-id discovery", f"{ISSUER}/.well-known/openid-configuration")
     if status == 200:
         report(disc.get("issuer") == ISSUER, "issuer is the configured one", str(disc.get("issuer")))
-    check("app", E["AP_ORIGIN"] + "/", want=(200, 302, 303))
-    check("gateway console", E["GW_CONSOLE_ORIGIN"] + "/", want=(200, 302, 303))
-    check("gateway data plane", E["GW_API_ORIGIN"] + "/v1/models", want=(401,))
-    check("cms studio", E["CMS_STUDIO_ORIGIN"] + "/mgmt/login", want=(200, 302))
-    check("cms demo website", E["CMS_DEMO_ORIGIN"] + "/", want=(200,))
-    check("knowledge base", E["KB_ORIGIN"] + "/kb/healthz", contains='"identity"')
-    check("benchmark", E["BENCH_ORIGIN"] + "/", want=(302, 303))
-    check("broker console", E["BROKER_ORIGIN"] + "/", want=(302, 303))
-    check("broker API", E["BROKER_API_ORIGIN"] + "/healthz")
-    check("aggregator console", E["AGG_CONSOLE_URL"] + "/", want=(302, 303))
-    check("aggregator API", E["AGG_API_ORIGIN"] + "/healthz")
-    check("aggregator's admin API is not at the edge", E["AGG_API_ORIGIN"] + "/api/v1/status", want=(404,))
+    for product, name, url, kw in [
+        ("ap", "app", E["AP_ORIGIN"] + "/", {"want": (200, 302, 303)}),
+        ("gw", "gateway console", E["GW_CONSOLE_ORIGIN"] + "/", {"want": (200, 302, 303)}),
+        ("gw", "gateway data plane", E["GW_API_ORIGIN"] + "/v1/models", {"want": (401,)}),
+        ("cms", "cms studio", E["CMS_STUDIO_ORIGIN"] + "/mgmt/login", {"want": (200, 302)}),
+        ("cms", "cms demo website", E["CMS_DEMO_ORIGIN"] + "/", {"want": (200,)}),
+        ("kb", "knowledge base", E["KB_ORIGIN"] + "/kb/healthz", {"contains": '"identity"'}),
+        ("bench", "benchmark", E["BENCH_ORIGIN"] + "/", {"want": (302, 303)}),
+        ("broker", "broker console", E["BROKER_ORIGIN"] + "/", {"want": (302, 303)}),
+        ("broker", "broker API", E["BROKER_API_ORIGIN"] + "/healthz", {}),
+        ("agg", "aggregator console", E["AGG_CONSOLE_URL"] + "/", {"want": (302, 303)}),
+        ("agg", "aggregator API", E["AGG_API_ORIGIN"] + "/healthz", {}),
+        ("agg", "aggregator's admin API is not at the edge", E["AGG_API_ORIGIN"] + "/api/v1/status", {"want": (404,)}),
+    ]:
+        if product_runs(product):
+            check(name, url, **kw)
     if not PUBLIC:
         check("grafana", E["GRAFANA_ORIGIN"] + "/api/health")
     if PUBLIC:
@@ -133,49 +145,55 @@ def edge() -> None:
         home, hdrs = f"http://pacod-caddy:{port}/", {"Host": f"localhost:{port}"}
     else:
         home, hdrs = E["DEMO_ORIGIN"] + "/", {}
-    check("home page", home, headers=hdrs, contains=E["CMS_STUDIO_ORIGIN"] + "/")
+    # A rendered template names the studio (with the CMS, from the CMS's hosts) or pacod-id's
+    # administration, which it always shows.
+    rendered = E["CMS_STUDIO_ORIGIN"] + "/" if product_runs("cms") else ISSUER + "/admin"
+    check("home page", home, headers=hdrs, contains=rendered)
     # Its files for crawlers and language models, templates like the page: the origin in them shows
     # they were rendered.
     check("home robots.txt", home + "robots.txt", headers=hdrs, contains=f"Sitemap: {E['DEMO_ORIGIN']}/sitemap.xml")
     check("home sitemap.xml", home + "sitemap.xml", headers=hdrs, contains=f"<loc>{E['DEMO_ORIGIN']}/</loc>")
-    check("home llms.txt", home + "llms.txt", headers=hdrs, contains=E["CMS_STUDIO_ORIGIN"] + "/")
+    check("home llms.txt", home + "llms.txt", headers=hdrs, contains=rendered)
 
 
 # ---- 2. Health of every service ------------------------------------------------------------------
 def health() -> None:
     section("health (pacod-net)")
-    for name, url in [
-        ("pacod-id ready", "http://pacod-id:9170/readyz"),
-        ("pacod-gw data plane ready", "http://pacod-gw:8080/readyz"),
-        ("pacod-gw management ready (pacod-admin-net)", "http://pacod-gw-admin:8081/readyz"),
-        ("gw-analytics ready", "http://gw-analytics:8090/readyz"),
-        ("gw-tester", "http://gw-tester:8095/healthz"),
-        ("ap-api", "http://ap-api:8000/health"),
-        ("ap-admin-api", "http://ap-admin-api:8000/health"),
-        ("ap-mcp", "http://ap-mcp:8000/health"),
-        ("pacod-embeddings", "http://pacod-embeddings:8080/health"),
-        ("cms-site", "http://cms-site:8443/web/v1/health"),
-        ("cms-studio", "http://cms-studio:7443/mgmt-health"),
-        ("kb-pipeline", "http://kb-pipeline:8000/health"),
+    for product, name, url in [
+        (None, "pacod-id ready", "http://pacod-id:9170/readyz"),
+        ("gw", "pacod-gw data plane ready", "http://pacod-gw:8080/readyz"),
+        ("gw", "pacod-gw management ready (pacod-admin-net)", "http://pacod-gw-admin:8081/readyz"),
+        ("gw", "gw-analytics ready", "http://gw-analytics:8090/readyz"),
+        ("gw", "gw-tester", "http://gw-tester:8095/healthz"),
+        ("ap", "ap-api", "http://ap-api:8000/health"),
+        ("ap", "ap-admin-api", "http://ap-admin-api:8000/health"),
+        ("ap", "ap-mcp", "http://ap-mcp:8000/health"),
+        ("ap", "pacod-embeddings", "http://pacod-embeddings:8080/health"),
+        ("cms", "cms-site", "http://cms-site:8443/web/v1/health"),
+        ("cms", "cms-studio", "http://cms-studio:7443/mgmt-health"),
+        ("kb", "kb-pipeline", "http://kb-pipeline:8000/health"),
         # Ready only with a current copy of its roles from pacod-id.
-        ("bench-api ready (pacod-admin-net)", "http://bench-api-internal:8190/api/v1/readyz"),
-        ("pacod-broker ready", "http://pacod-broker:8060/readyz"),
-        ("pacod-broker admin (pacod-admin-net)", "http://pacod-broker-admin:8061/healthz"),
+        ("bench", "bench-api ready (pacod-admin-net)", "http://bench-api-internal:8190/api/v1/readyz"),
+        ("broker", "pacod-broker ready", "http://pacod-broker:8060/readyz"),
+        ("broker", "pacod-broker admin (pacod-admin-net)", "http://pacod-broker-admin:8061/healthz"),
         # Ready only with a current copy of its roles from pacod-id.
-        ("pacod-aggregator ready", "http://pacod-aggregator:8150/readyz"),
-        ("pacod-aggregator admin (pacod-admin-net)", "http://pacod-aggregator-admin:8151/healthz"),
-        ("agg-scraper ready", "http://agg-scraper:8152/readyz"),
-        ("pacod-qdrant", "http://pacod-qdrant:6333/readyz"),
-        ("pacod-prometheus", "http://pacod-prometheus:9090/-/ready"),
-        ("pacod-alertmanager", "http://pacod-alertmanager:9093/-/ready"),
-        ("pacod-grafana", "http://pacod-grafana:3000/api/health"),
+        ("agg", "pacod-aggregator ready", "http://pacod-aggregator:8150/readyz"),
+        ("agg", "pacod-aggregator admin (pacod-admin-net)", "http://pacod-aggregator-admin:8151/healthz"),
+        ("agg", "agg-scraper ready", "http://agg-scraper:8152/readyz"),
+        (None, "pacod-qdrant", "http://pacod-qdrant:6333/readyz"),
+        (None, "pacod-prometheus", "http://pacod-prometheus:9090/-/ready"),
+        (None, "pacod-alertmanager", "http://pacod-alertmanager:9093/-/ready"),
+        (None, "pacod-grafana", "http://pacod-grafana:3000/api/health"),
     ]:
-        check(name, url)
-    status, body, _ = http("GET", "http://kb-ui:8080/kb/healthz")
-    ident = body.get("identity") if isinstance(body, dict) else None
-    report(status == 200 and ident == "ready", "kb-ui signed in to pacod-id", f"identity={ident}")
+        if product_runs(product):
+            check(name, url)
+    if product_runs("kb"):
+        status, body, _ = http("GET", "http://kb-ui:8080/kb/healthz")
+        ident = body.get("identity") if isinstance(body, dict) else None
+        report(status == 200 and ident == "ready", "kb-ui signed in to pacod-id", f"identity={ident}")
 
-    # Prometheus: every target up (the app's ingestion only when it runs).
+    # Prometheus: every target up (the app's ingestion only when it runs), but those of the products
+    # that do not run: every product's scrape jobs stay (platform.yml), by the products' own names.
     status, body, _ = http("GET", "http://pacod-prometheus:9090/api/v1/targets?state=active")
     if status != 200:
         report(False, "prometheus targets", str(status))
@@ -184,12 +202,18 @@ def health() -> None:
     ingestion = "ingestion" in E.get("DEMO_PROFILES", "")
     down = [t for t in targets if t["health"] != "up"]
     bridge = "broker" in Path("/state/profiles").read_text() if Path("/state/profiles").exists() else False
+    job_products = {"pacod-gw-core": "gw", "api": "ap", "admin-api": "ap", "mcp-server": "ap", "embeddings": "ap",
+                    "ingestion": "ap", "frontend": "ap", "pgbouncer": "ap", "redis": "ap", "pacod-bench": "bench",
+                    "pacod-broker": "broker", "pacod-aggregator": "agg"}
     hard = [t for t in down if not (t["labels"]["job"] == "ingestion" and not ingestion)
-            and not (t["labels"]["job"] == "pacod-gw-broker" and not bridge)]
+            and not (t["labels"]["job"] == "pacod-gw-broker" and not bridge)
+            and product_runs(job_products.get(t["labels"]["job"]))]
     jobs = sorted({t["labels"]["job"] for t in targets})
+    left_out = [p for p in ALL_PRODUCTS if not product_runs(p)]
     report(not hard, f"prometheus: {len(targets) - len(down)}/{len(targets)} targets up ({len(jobs)} jobs)",
            ", ".join(f"{t['labels']['job']}={t['lastError'][:60]}" for t in hard)
-           + ("" if ingestion else "  (the app's ingestion is off: DEMO_PROFILES)"))
+           + ("" if ingestion else "  (the app's ingestion is off: DEMO_PROFILES)")
+           + (f"  (not running: {', '.join(left_out)}, DEMO_PRODUCTS)" if left_out else ""))
 
     # One monitoring stack for every product: the gateway's, the app's and the broker's rules and
     # dashboards.
@@ -236,16 +260,18 @@ def sso() -> None:
 
     idjar = Jar()
     products = [
-        ("app (pacod-ap)", E["AP_ORIGIN"], "/auth/login", "/auth/callback"),
-        ("gateway console (pacod-gw)", E["GW_CONSOLE_ORIGIN"], "/auth/login", "/auth/callback"),
-        ("cms studio (pacod-cms)", E["CMS_STUDIO_ORIGIN"], "/mgmt/oauth2/authorization/pacod-id",
+        ("ap", "app (pacod-ap)", E["AP_ORIGIN"], "/auth/login", "/auth/callback"),
+        ("gw", "gateway console (pacod-gw)", E["GW_CONSOLE_ORIGIN"], "/auth/login", "/auth/callback"),
+        ("cms", "cms studio (pacod-cms)", E["CMS_STUDIO_ORIGIN"], "/mgmt/oauth2/authorization/pacod-id",
          "/mgmt/oauth2/code/pacod-id"),
-        ("knowledge base (pacod-kb)", E["KB_ORIGIN"], "/kb/login", "/kb/auth/callback"),
-        ("benchmark (pacod-benchmark)", E["BENCH_ORIGIN"], "/auth/login", "/auth/callback"),
-        ("broker console (pacod-broker)", E["BROKER_ORIGIN"], "/auth/login", "/auth/callback"),
-        ("aggregator console (pacod-aggregator)", E["AGG_CONSOLE_URL"], "/auth/login", "/auth/callback"),
+        ("kb", "knowledge base (pacod-kb)", E["KB_ORIGIN"], "/kb/login", "/kb/auth/callback"),
+        ("bench", "benchmark (pacod-benchmark)", E["BENCH_ORIGIN"], "/auth/login", "/auth/callback"),
+        ("broker", "broker console (pacod-broker)", E["BROKER_ORIGIN"], "/auth/login", "/auth/callback"),
+        ("agg", "aggregator console (pacod-aggregator)", E["AGG_CONSOLE_URL"], "/auth/login", "/auth/callback"),
     ]
-    for name, origin, login, callback in products:
+    for product, name, origin, login, callback in products:
+        if not product_runs(product):
+            continue
         jar = Jar()
         status, _, to = follow("GET", origin + login, jar)
         if not to.startswith(ISSUER + "/oidc/authorize"):
@@ -277,13 +303,22 @@ def sso() -> None:
         report(ok, f"{name}: its callback opens a session", f"{status} -> {landing[:50] or '(no redirect)'}")
 
     # pacod-id gives the admin PID_BOOTSTRAP_ADMIN_ROLES only when it creates the account; the
-    # bootstrap gives an older account what it lacks (admin_roles in scripts/bootstrap.py).
-    roles = gw.read_env(Path("/state/env/id.env")).get("PID_BOOTSTRAP_ADMIN_ROLES", "")
+    # bootstrap gives an older account what it lacks (admin_roles in scripts/bootstrap.py), of the
+    # products that run (DEMO_ADMIN_ROLES).
+    roles = E.get("DEMO_ADMIN_ROLES")
+    if roles is None:
+        roles = gw.read_env(Path("/state/env/id.env")).get("PID_BOOTSTRAP_ADMIN_ROLES", "")
+    if not idjar.cookies:
+        if any(product_runs(p) for p, *_ in products):
+            report(False, "the admin's roles", "no sign-in at pacod-id to read them with (above)")
+        else:
+            report(None, "the admin's roles", "not tested: no product runs to sign in to (DEMO_PRODUCTS)")
+        return
     status, body, _ = follow("GET", f"{ISSUER}/ui-api/v1/admin/bindings", idjar)
     bindings = body.get("bindings", []) if isinstance(body, dict) else []
     held = {b["role"] for b in bindings if b.get("scope") == "platform"}
     missing = [r for r in roles.split(",") if r and r not in held]
-    report(status == 200 and not missing, "the admin holds every role of PID_BOOTSTRAP_ADMIN_ROLES",
+    report(status == 200 and not missing, "the admin holds every role of the products that run",
            f"{status}, lacks {', '.join(missing)}: make bootstrap" if missing else f"{len(held)} roles")
 
 
@@ -292,7 +327,16 @@ def gateway() -> None:
     section("gateway (pacod-gw, one key per product)")
     creds = gw.read_env(Path("/state/bootstrap.env"))
     model = E.get("CMS_AI_MODEL", "anthropic/claude-haiku-4-5")
-    for product, var in [("pacod-ap", "GATEWAY_KEY_API"), ("pacod-cms", "CMS_GW_KEY"), ("pacod-kb", "KB_GW_KEY")]:
+    # The keys of the products that run (the bootstrap makes every product's); the aggregator's when
+    # it is the only one that calls the gateway.
+    keys = [(product, var) for p, product, var in [("ap", "pacod-ap", "GATEWAY_KEY_API"),
+                                                   ("cms", "pacod-cms", "CMS_GW_KEY"),
+                                                   ("kb", "pacod-kb", "KB_GW_KEY")] if product_runs(p)]
+    if not keys and product_runs("agg"):
+        keys = [("pacod-aggregator", "AGG_GW_KEY")]
+    if not keys:
+        report(None, "the products' keys", "not tested: no product that calls the gateway runs (DEMO_PRODUCTS)")
+    for product, var in keys:
         key = creds.get(var)
         if not key:
             report(False, f"{product}: key", f"{var} is not in .state/bootstrap.env (make bootstrap)")
@@ -308,8 +352,10 @@ def gateway() -> None:
                                body={"model": model, "messages": [{"role": "user", "content": "ping"}]})
         text = body["choices"][0]["message"]["content"] if status == 200 else str(body)[:120]
         report(status == 200, f"{product}: a chat completion", f"{status} {text[:50]!r}")
-    cms_stored_key(creds)
-    response_cache(creds.get("GATEWAY_KEY_API"), model)
+    if product_runs("cms"):
+        cms_stored_key(creds)
+    if keys:
+        response_cache(keys[0][0], creds.get(keys[0][1]), model)
 
 
 def cms_stored_key(creds: dict[str, str]) -> None:
@@ -338,14 +384,14 @@ def cms_stored_key(creds: dict[str, str]) -> None:
                             ", ".join(f"{f} {m}" for f, m in held.items())))
 
 
-def response_cache(key: str | None, model: str) -> None:
+def response_cache(product: str, key: str | None, model: str) -> None:
     """The response cache (pacod-gw's docs/plugin-concept.md, section 15), off in a gateway by
-    default but on in the demo (overlays/gw.yml): the same call at temperature 0 twice; the second
-    is answered from gw-valkey, without the provider. Switched off in the console, the call reaches
-    the provider and is not kept."""
+    default but on in the demo (overlays/gw.yml): the same call at temperature 0 twice, with the
+    key of `product`; the second is answered from gw-valkey, without the provider. Switched off in
+    the console, the call reaches the provider and is not kept."""
     if not key:
         return
-    auth = {"Authorization": f"Bearer {key}", **AGENT_HEADERS["pacod-ap"]}
+    auth = {"Authorization": f"Bearer {key}", **AGENT_HEADERS.get(product, {})}
     body = {"model": model, "temperature": 0,
             "messages": [{"role": "user", "content": f"Remember this answer (verify {uuid.uuid4().hex[:8]})."}]}
     # One reply for each call that may reach the mock; what is left is removed below, so that no
@@ -600,6 +646,24 @@ def bench() -> None:
 def broker() -> None:
     section("broker (pacod-broker: pacod-gw's bridge, pacod-ap and the CMS)")
     made = gw.read_env(Path("/state/bootstrap.env"))
+    if product_runs("gw"):
+        broker_gateway(made)
+    # pacod-ap, the CMS studio and pacod-kb search it with their own tokens.
+    for product, var in (("ap", "BROKER_AP_TOKEN"), ("cms", "CMS_BROKER_TOKEN"), ("kb", "KB_BROKER_TOKEN")):
+        if not product_runs(product):
+            continue
+        if not made.get(var):
+            report(False, f"{var} searches the broker", "missing (make bootstrap)")
+            continue
+        auth = {"Authorization": f"Bearer {made[var]}"}
+        status, _, _ = http("POST", "http://pacod-broker:8060/v1/discover", body={"limit": 1}, headers=auth)
+        report(status == 200, f"{var} searches the broker", str(status))
+    if product_runs("ap"):
+        broker_ap(made)
+
+
+def broker_gateway(made: dict[str, str]) -> None:
+    """pacod-gw on the broker: its bridge (gw-broker) and its core."""
     missing = [v for v in ("GWB_GW_TOKEN", "GWB_CONSUMER_TOKEN", "PGW_BROKER_TOKEN") if not made.get(v)]
     if missing:
         report(False, "the bridge's and the core's tokens", f"{', '.join(missing)} missing (make bootstrap)")
@@ -623,14 +687,10 @@ def broker() -> None:
         reachable = isinstance(body, dict) and body.get("reachable") is True
         report(status == 200 and reachable, "the gateway's core reaches the broker",
                f"{status} {gw.short(body) if not reachable else ''}")
-    # pacod-ap, the CMS studio and pacod-kb search it with their own tokens.
-    for var in ("BROKER_AP_TOKEN", "CMS_BROKER_TOKEN", "KB_BROKER_TOKEN"):
-        if not made.get(var):
-            report(False, f"{var} searches the broker", "missing (make bootstrap)")
-            continue
-        auth = {"Authorization": f"Bearer {made[var]}"}
-        status, _, _ = http("POST", "http://pacod-broker:8060/v1/discover", body={"limit": 1}, headers=auth)
-        report(status == 200, f"{var} searches the broker", str(status))
+
+
+def broker_ap(made: dict[str, str]) -> None:
+    """pacod-ap on the broker: its connection, its starter agent and the agents' site."""
     # pacod-ap's own view of the connection the bootstrap provisioned: its Broker page's "Test
     # connection" (the broker answers, and takes pacod-ap's token).
     if PUBLIC:
@@ -680,6 +740,9 @@ def aggregator() -> None:
     have = gw.read_env(Path("/state/bootstrap.env"))
     status, _, _ = http("GET", "http://pacod-aggregator:8150/v1/catalog")
     report(status == 401, "the catalogue refuses a call without a token", str(status))
+    # The rest is the gateway's: its token for the catalogue, and its sync.
+    if not product_runs("gw"):
+        return
     token = have.get("PGW_AGGREGATOR_TOKEN")
     if not token:
         report(False, "PGW_AGGREGATOR_TOKEN reads the catalogue", "missing (make bootstrap)")
@@ -727,9 +790,17 @@ def aggregator() -> None:
             report(None, name, "not tested: the catalogue is empty, and its lists need the internet")
 
 
+# Each section and the product it checks (None: always); one named on the command line runs anyway.
+SECTIONS = {"edge": None, "health": None, "sso": None, "gateway": "gw", "tools": "ap", "app": "ap", "kb": "kb",
+            "cms": "cms", "bench": "bench", "broker": "broker", "aggregator": "agg"}
+
+
 def main() -> None:
-    only = sys.argv[1:] or ["edge", "health", "sso", "gateway", "tools", "app", "kb", "cms", "bench", "broker",
-                            "aggregator"]
+    only = sys.argv[1:] or [name for name, product in SECTIONS.items() if product_runs(product)]
+    left_out = [p for p in ALL_PRODUCTS if not product_runs(p)]
+    if left_out:
+        print(f"\nthe products that run: {', '.join(p for p in ('id', *ALL_PRODUCTS) if product_runs(p))} (DEMO_PRODUCTS);"
+              f" not checked: {', '.join(left_out)}", flush=True)
     for name in only:
         globals()[name]()
     print()

@@ -3,13 +3,19 @@
 # here (one instance of every shared component, one published port, the listeners kept on
 # pacod-admin-net); the rest runs on pacod-net and pacod-admin-net in the tools image
 # (scripts/verify.py). Exits 1 when any check fails.
+#
+# Only the products that run are checked (demo.env's DEMO_PRODUCTS, render-env.sh's .state/products).
 set -u
 cd "$(dirname "$0")/.."
 fails=0
 report() { printf '  %s  %s%s\n' "$1" "$2" "${3:+  $3}"; [ "$1" = FAIL ] && fails=$((fails + 1)); return 0; }
+# Whether a product runs; every one without .state/products.
+runs() { [ ! -f .state/products ] || grep -qw "$1" .state/products; }
+# Its arguments when the product runs: `$(when gw pacod-gw gw-mock)`.
+when() { p=$1; shift; if runs "$p"; then echo "$@"; fi; }
 
 echo "single instances (docker)"
-for name in pacod-caddy pacod-postgres pacod-qdrant pacod-embeddings pacod-id pacod-gw gw-mock \
+for name in pacod-caddy pacod-postgres pacod-qdrant $(when ap pacod-embeddings) pacod-id $(when gw pacod-gw gw-mock) \
 	pacod-mailpit pacod-prometheus pacod-alertmanager pacod-grafana pacod-otel; do
 	n=$(docker ps --filter "name=^${name}$" --filter status=running -q | wc -l | tr -d ' ')
 	if [ "$n" = 1 ]; then report PASS "$name" "1 running"; else report FAIL "$name" "$n running"; fi
@@ -47,16 +53,21 @@ for c in $(docker network inspect -f '{{range .Containers}}{{.Name}} {{end}}' pa
 done
 if [ -z "$others" ]; then report PASS "only the listeners and their callers join it"; else report FAIL "only the listeners and their callers join it" "also: $others"; fi
 # What a page runs in reaches nothing but the scraper's egress proxy.
-browser_nets=$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' agg-browser 2>/dev/null)
-case "$browser_nets" in
-	*agg-browser-net\ ) if [ "$(echo "$browser_nets" | wc -w)" -eq 1 ]; then report PASS "agg-browser is on agg-browser-net alone"; else report FAIL "agg-browser is on agg-browser-net alone" "$browser_nets"; fi ;;
-	*) report FAIL "agg-browser is on agg-browser-net alone" "${browser_nets:-not running}" ;;
-esac
+if runs agg; then
+	browser_nets=$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' agg-browser 2>/dev/null)
+	case "$browser_nets" in
+		*agg-browser-net\ ) if [ "$(echo "$browser_nets" | wc -w)" -eq 1 ]; then report PASS "agg-browser is on agg-browser-net alone"; else report FAIL "agg-browser is on agg-browser-net alone" "$browser_nets"; fi ;;
+		*) report FAIL "agg-browser is on agg-browser-net alone" "${browser_nets:-not running}" ;;
+	esac
+fi
 probe() { docker run --rm --network "$1" busybox:1.38.0 wget -q -T 3 -O /dev/null "$2" >/dev/null 2>&1; }
-for target in http://pacod-gw:8081/readyz http://pacod-id:8071/oidc/jwks http://bench-api:8190/api/v1/healthz http://pacod-broker:8061/healthz http://pacod-aggregator:8151/healthz; do
+# A listener that does not run would pass the first loop for nothing: only those that run.
+for target in $(when gw http://pacod-gw:8081/readyz) http://pacod-id:8071/oidc/jwks $(when bench http://bench-api:8190/api/v1/healthz) \
+	$(when broker http://pacod-broker:8061/healthz) $(when agg http://pacod-aggregator:8151/healthz); do
 	if probe pacod-net "$target"; then report FAIL "$target refused on pacod-net" "it answered"; else report PASS "$target refused on pacod-net"; fi
 done
-for target in http://pacod-gw-admin:8081/readyz http://pacod-id-internal:8071/oidc/jwks http://bench-api-internal:8190/api/v1/healthz http://pacod-broker-admin:8061/healthz http://pacod-aggregator-admin:8151/healthz; do
+for target in $(when gw http://pacod-gw-admin:8081/readyz) http://pacod-id-internal:8071/oidc/jwks $(when bench http://bench-api-internal:8190/api/v1/healthz) \
+	$(when broker http://pacod-broker-admin:8061/healthz) $(when agg http://pacod-aggregator-admin:8151/healthz); do
 	if probe pacod-admin-net "$target"; then report PASS "$target answers on pacod-admin-net"; else report FAIL "$target answers on pacod-admin-net"; fi
 done
 

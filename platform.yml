@@ -116,6 +116,8 @@ services:
       BROKER_API_SITE: ${BROKER_API_SITE}
       AGG_SITE: ${AGG_SITE}
       AGG_API_SITE: ${AGG_API_SITE}
+      # The products the home page shows: those that run (demo.env's DEMO_PRODUCTS).
+      DEMO_PRODUCTS: ${DEMO_PRODUCTS}
       # The home page's notice of the nightly reset (the Makefile's scheduler).
       DEMO_RESET: ${DEMO_RESET}
       DEMO_RESET_TIME: ${DEMO_RESET_TIME}

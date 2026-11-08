@@ -19,9 +19,16 @@ TOOLS := pacod-demo-tools:dev
 SHOTS := pacod-demo-shots:dev
 # Docker's CLI, make and tar: the nightly reset's scheduler and the baseline's archiver.
 RESET := pacod-demo-reset:dev
-# The compose project: the eight repositories' own compose files plus the shared layer.
-COMPOSE = COMPOSE_PROFILES=$$(cat .state/profiles 2>/dev/null || echo ui) docker compose \
-	--project-directory . -f compose.yml
+# The compose project: the eight repositories' own compose files plus the shared layer, for the
+# products demo.env's DEMO_PRODUCTS runs: .state/compose.yml, which scripts/render-env.sh makes
+# from compose.yml without the others. COMPOSE_ALL: every product's (make clean).
+COMPOSE_WITH = COMPOSE_PROFILES=$$(cat .state/profiles 2>/dev/null || echo ui) docker compose \
+	--project-directory . -f
+COMPOSE = $(COMPOSE_WITH) $$(test -f .state/compose.yml && echo .state/compose.yml || echo compose.yml)
+COMPOSE_ALL = $(COMPOSE_WITH) compose.yml
+# Whether a product runs, by its overlay's name (render-env.sh's .state/products; without it
+# every product does): `if $(call runs,ap); then ...`.
+runs = { [ ! -f .state/products ] || grep -qw $(1) .state/products; }
 # The tools image on pacod-net, and on pacod-admin-net for the gateway's management API, with
 # the demo's state and the repositories it reuses.
 TOOLS_RUN = docker run --rm --network pacod-net --network pacod-admin-net --user $$(id -u):$$(id -g) \
@@ -43,7 +50,7 @@ HF_CACHE_OLD := pacod-demo_pacod-hf-cache
 
 .PHONY: help up run start redeploy restart verify down stop clean remove build status ps logs urls bootstrap \
 	preflight network tools init render seed hosts config shots cms-space cms-seed \
-	baseline first-baseline reset scheduler reset-image google
+	baseline first-baseline reset scheduler reset-image google prune
 
 help:
 	@echo "pacod full-stack demo (configuration: demo.env)"
@@ -73,7 +80,7 @@ help:
 
 # ---- run ------------------------------------------------------------------------------------------
 
-up: preflight network tools init render
+up: preflight network tools init render prune
 	@echo "up: starting the stack (the first start builds the images and downloads models)"
 	@sh scripts/build.sh --missing
 	$(COMPOSE) up -d --remove-orphans --no-build $(WAIT)
@@ -92,7 +99,7 @@ run: up
 # and recreate only those containers (--no-deps: compose would otherwise rebuild and recreate what
 # they depend on as well, pacod-embeddings among them, which then loads its models again).
 # restart S="<services>": restart them as they are.
-start: network render
+start: network render prune
 	@test -f .state/secrets.env || { echo "start: no stack yet; run make up" >&2; exit 1; }
 	$(COMPOSE) up -d --remove-orphans --no-build $(WAIT)
 	@$(MAKE) --no-print-directory urls
@@ -109,6 +116,23 @@ redeploy: network render
 restart: render
 	@test -n "$(S)" || { echo 'usage: make restart S="<service> [<service>...]"' >&2; exit 1; }
 	$(COMPOSE) restart $(S)
+
+# The project's containers of services that do not run now (DEMO_PRODUCTS, compose's profiles).
+# compose removes a left-out product's as orphans, but not one whose service is only in a profile
+# that is off (gw-broker without pacod-broker, pacod-ap's exporters without pacod-ap): its container
+# keeps running, through `up --remove-orphans` and `down --remove-orphans` alike. Before every start
+# (and every reset and baseline, which copy volumes while nothing uses them); one-off containers
+# (make cms-space) are left be. Their data stays in their volumes.
+prune: render
+	@services=$$($(COMPOSE) config --services) || exit 1; \
+	keep=" $$(echo $$services) "; \
+	docker ps -a --filter label=com.docker.compose.project=pacod-demo \
+		--format '{{.Names}} {{.Label "com.docker.compose.service"}} {{.Label "com.docker.compose.oneoff"}}' | \
+	while read -r name service oneoff; do \
+		case "$$oneoff:$$keep" in True:* | *" $$service "*) continue ;; esac; \
+		echo "prune: removing $$name: $$service does not run (DEMO_PRODUCTS)"; \
+		docker rm -f "$$name" >/dev/null; \
+	done
 
 # The machine's configuration: git ignores it; the first run copies the committed template.
 demo.env:
@@ -157,30 +181,37 @@ render: demo.env
 # changed). Then pacod-ap's admin API registers its agents (profiles) in the gateway and binds
 # pacod-ap's keys to them, and the tools phase registers ap-api's /mcp as the gateway's tool
 # server pacod-ap: both need the recreated services. Last, pacod-ap's starter agent is offered on
-# pacod-broker as demo.env's AP_BROKER_OFFER says.
+# pacod-broker as demo.env's AP_BROKER_OFFER says. Each step only for the products that run
+# (DEMO_PRODUCTS): scripts/bootstrap.py and scripts/broker-offer.sh skip the others' steps.
 bootstrap: network tools render
 	@# pacod-ap's keys are bound to its agents only while its running images name each call's
 	@# agent (scripts/ap-names-agents.sh); an older image keeps them unbound until make build.
 	@AP_GW_AGENTS=$$(sh scripts/ap-names-agents.sh); export AP_GW_AGENTS; \
 		$(TOOLS_RUN) python3 -I /work/scripts/bootstrap.py
 	@sh scripts/render-env.sh
-	$(COMPOSE) up -d --no-deps $(WAIT) $(RECREATE)
+	@# Those of RECREATE that run: compose refuses a service the project lacks.
+	@set --; for s in $$($(COMPOSE) config --services); do \
+		case " $(RECREATE) " in *" $$s "*) set -- "$$@" "$$s" ;; esac; done; \
+	if [ $$# -gt 0 ]; then $(COMPOSE) up -d --no-deps $(WAIT) "$$@"; fi
 	@# pacod-gw's bridge to pacod-broker: its profile is on once the bootstrap made its tokens.
 	@if grep -q broker .state/profiles; then $(COMPOSE) up -d --no-deps $(WAIT) gw-broker; fi
-	@if docker exec ap-admin-api python -c 'import admin_api.services.gateway_agent_sync' >/dev/null 2>&1; then \
+	@if ! $(call runs,ap); then :; \
+	elif docker exec ap-admin-api python -c 'import admin_api.services.gateway_agent_sync' >/dev/null 2>&1; then \
 		docker exec ap-admin-api python -m admin_api.services.gateway_agent_sync once; \
 	else echo "bootstrap: the running pacod-ap registers no gateway agents (an older image); make build, then make bootstrap"; fi
 	@$(TOOLS_RUN) python3 -I /work/scripts/bootstrap.py tools
 	@sh scripts/broker-offer.sh
 
 # The app's own seed (pacod-ap's bootstrap-local): tables, the starter agent's facts, dev users,
-# and its corpus when its ingestion runs. Each step is idempotent.
+# and its corpus when its ingestion runs. Each step is idempotent. Nothing while pacod-ap does not run.
 seed:
-	@echo "seed: the app's database and starter agent"
-	@docker exec ap-api python -m scripts.init_db >/dev/null
-	@docker exec ap-api python -m scripts.seed_reference_facts --profile starter >/dev/null
-	@docker exec ap-api python -m scripts.seed_dev_users >/dev/null
-	@if docker ps --format '{{.Names}}' | grep -qx ap-ingestion-cpu; then \
+	@if ! $(call runs,ap); then echo "seed: pacod-ap does not run (DEMO_PRODUCTS): nothing to seed"; exit 0; fi; \
+	set -e; \
+	echo "seed: the app's database and starter agent"; \
+	docker exec ap-api python -m scripts.init_db >/dev/null; \
+	docker exec ap-api python -m scripts.seed_reference_facts --profile starter >/dev/null; \
+	docker exec ap-api python -m scripts.seed_dev_users >/dev/null; \
+	if docker ps --format '{{.Names}}' | grep -qx ap-ingestion-cpu; then \
 		docker exec ap-ingestion-cpu python -m scripts.ingest_corpus --profile starter >/dev/null; fi
 
 verify:
@@ -199,16 +230,18 @@ verify:
 reset-image:
 	@docker image inspect $(RESET) >/dev/null 2>&1 || docker build -q -t $(RESET) tools/reset/ >/dev/null
 
-baseline: init render reset-image
+baseline: init render prune reset-image
 	@sh scripts/baseline.sh save
 	@$(MAKE) --no-print-directory scheduler
 
-# Once, on a stack whose data this make up made, after the CMS has written its demo websites.
+# Once, on a stack whose data this make up made, after the CMS has written its demo websites (when
+# it runs). It holds the data of the products that run then: a product added later keeps its own
+# through every reset until make baseline.
 first-baseline:
-	@if [ -f .state/baseline-pending ] && sh scripts/baseline.sh wait-cms; then \
+	@if [ -f .state/baseline-pending ] && { ! $(call runs,cms) || sh scripts/baseline.sh wait-cms; }; then \
 		$(MAKE) --no-print-directory baseline && rm -f .state/baseline-pending; fi
 
-reset: init render reset-image
+reset: init render prune reset-image
 	@sh scripts/baseline.sh restore
 	@$(MAKE) --no-print-directory bootstrap
 	@$(MAKE) --no-print-directory google
@@ -254,6 +287,7 @@ google: render
 # older one refuses the set before it creates anything. The baseline still holds the stack as it
 # was, so the nightly reset would take Starward back: make baseline afterwards.
 cms-space: render
+	@$(call runs,cms) || { echo "cms-space: pacod-cms does not run: add cms to DEMO_PRODUCTS (demo.env, or demo.local.env for this machine), then make up" >&2; exit 1; }
 	@host=$$(sed -n 's/^CMS_SPACE_HOST=//p' .state/env/stack.env); \
 	org="$(ORG)"; \
 	if [ -z "$$org" ]; then \
@@ -274,6 +308,7 @@ cms-space: render
 # It keeps the website's template set: Starward's layouts only on magazine (else cms-space).
 cms-seed: render
 	@test -n "$(SITE)" || { echo 'usage: make cms-seed SITE=<website id: demo, minimal, space> [DEMO=space]'; exit 2; }
+	@$(call runs,cms) || { echo "cms-seed: pacod-cms does not run: add cms to DEMO_PRODUCTS (demo.env, or demo.local.env for this machine), then make up" >&2; exit 1; }
 	$(CMS_CLI) --seed-demo --site-id="$(SITE)" $(if $(DEMO),--demo="$(DEMO)")
 
 # ---- stop, remove ---------------------------------------------------------------------------------
@@ -294,13 +329,14 @@ clean:
 	@# The scheduler is not one of the project's containers (scheduler).
 	@docker rm -f pacod-demo-reset >/dev/null 2>&1 || true
 	@# With its secrets the project is taken down by compose, from freshly rendered env files
-	@# (compose also knows its images); without them (a run that failed half-way) by its label.
+	@# (compose also knows its images), with every product's files, those DEMO_PRODUCTS leaves out
+	@# too; without them (a run that failed half-way) by its label. What compose leaves (a container
+	@# whose service is in a profile that is off, make prune) goes by its label as well.
 	@if [ -f .state/secrets.env ] && sh scripts/render-env.sh; then \
-		$(COMPOSE) down --volumes --remove-orphans $(if $(filter 1,$(IMAGES)),--rmi all); \
-	else \
-		ids=$$(docker ps -aq --filter label=com.docker.compose.project=pacod-demo); \
-		if [ -n "$$ids" ]; then docker rm -f $$ids >/dev/null; fi; \
-	fi
+		$(COMPOSE_ALL) down --volumes --remove-orphans $(if $(filter 1,$(IMAGES)),--rmi all); \
+	fi; \
+	ids=$$(docker ps -aq --filter label=com.docker.compose.project=pacod-demo); \
+	if [ -n "$$ids" ]; then docker rm -f $$ids >/dev/null; fi
 	@# Volumes of services the compose files no longer define (an optional profile that was on,
 	@# a component removed since) are not removed by down: every volume of the project is.
 	@vols=$$(docker volume ls -q --filter label=com.docker.compose.project=pacod-demo); \
@@ -337,25 +373,34 @@ config: render
 
 urls: render
 	@set -a; . .state/env/stack.env; set +a; \
+	on() { case ",$$DEMO_PRODUCTS," in *,$$1,*) ;; *) return 1 ;; esac; }; \
 	echo ""; \
 	echo "pacod demo: $$DEMO_URL_SCHEME://<name>.$$DEMO_DOMAIN$${DEMO_URL_PORT:+:$$DEMO_URL_PORT}"; \
 	echo ""; \
 	echo "  Home (every product)        $$DEMO_ORIGIN"; \
-	echo "  App (pacod-ap)              $$AP_ORIGIN"; \
-	echo "  Gateway console (pacod-gw)  $$GW_CONSOLE_ORIGIN"; \
-	echo "  Gateway API (OpenAI)        $$GW_API_ORIGIN/v1"; \
-	echo "  Gateway MCP (tools)         $$GW_API_ORIGIN/mcp (TOOLS_GW_KEY in .state/bootstrap.env)"; \
-	echo "  CMS studio (pacod-cms)      $$CMS_STUDIO_ORIGIN"; \
-	echo "  CMS demo website            $$CMS_DEMO_ORIGIN"; \
-	echo "  CMS minimal website         $$CMS_MINIMAL_ORIGIN"; \
-	echo "  CMS space website           $$CMS_SPACE_ORIGIN"; \
-	echo "  Knowledge base (pacod-kb)   $$KB_ORIGIN"; \
-	echo "  Benchmark (pacod-benchmark) $$BENCH_ORIGIN"; \
-	echo "  Broker (pacod-broker)       $$BROKER_ORIGIN"; \
-	echo "  Broker API (discovery)      $$BROKER_API_ORIGIN/v1"; \
-	echo "  Aggregator (pacod-aggregator) $$AGG_CONSOLE_URL"; \
-	echo "  Aggregator API (catalogue)  $$AGG_API_ORIGIN/v1"; \
-	echo "  Agents API (pacod-ap)       $$AP_AGENTS_ORIGIN/v1, MCP at /mcp"; \
+	if on ap; then echo "  App (pacod-ap)              $$AP_ORIGIN"; fi; \
+	if on gw; then \
+		echo "  Gateway console (pacod-gw)  $$GW_CONSOLE_ORIGIN"; \
+		echo "  Gateway API (OpenAI)        $$GW_API_ORIGIN/v1"; \
+		if on ap; then echo "  Gateway MCP (tools)         $$GW_API_ORIGIN/mcp (TOOLS_GW_KEY in .state/bootstrap.env)"; fi; \
+	fi; \
+	if on cms; then \
+		echo "  CMS studio (pacod-cms)      $$CMS_STUDIO_ORIGIN"; \
+		echo "  CMS demo website            $$CMS_DEMO_ORIGIN"; \
+		echo "  CMS minimal website         $$CMS_MINIMAL_ORIGIN"; \
+		echo "  CMS space website           $$CMS_SPACE_ORIGIN"; \
+	fi; \
+	if on kb; then echo "  Knowledge base (pacod-kb)   $$KB_ORIGIN"; fi; \
+	if on bench; then echo "  Benchmark (pacod-benchmark) $$BENCH_ORIGIN"; fi; \
+	if on broker; then \
+		echo "  Broker (pacod-broker)       $$BROKER_ORIGIN"; \
+		echo "  Broker API (discovery)      $$BROKER_API_ORIGIN/v1"; \
+	fi; \
+	if on agg; then \
+		echo "  Aggregator (pacod-aggregator) $$AGG_CONSOLE_URL"; \
+		echo "  Aggregator API (catalogue)  $$AGG_API_ORIGIN/v1"; \
+	fi; \
+	if on ap; then echo "  Agents API (pacod-ap)       $$AP_AGENTS_ORIGIN/v1, MCP at /mcp"; fi; \
 	echo "  Identity (pacod-id)         $$PACOD_ID_ISSUER/admin"; \
 	echo "  Grafana                     $$GRAFANA_ORIGIN"; \
 	echo "  Mail (every mail sent)      $$MAIL_ORIGIN"; \

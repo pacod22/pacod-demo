@@ -135,10 +135,15 @@ always.
 
 ### A demo on this machine only
 
-In demo.env: `DEMO_DOMAIN=localhost`, `DEMO_TLS_CERT=` and `DEMO_TLS_KEY=` (empty),
-`DEMO_HTTP_PORT=8800`, `DEMO_BIND=127.0.0.1`. Then everything is plain HTTP at
-http://<name>.localhost:8800 (browsers and curl resolve `*.localhost` to 127.0.0.1 without DNS;
-Safari may not: use another browser, or add `make hosts`'s lines to `/etc/hosts`).
+In demo.env, or in demo.local.env to leave demo.env as the server's: `DEMO_DOMAIN=localhost`,
+`DEMO_TLS_CERT=` and `DEMO_TLS_KEY=` (empty), `DEMO_HTTP_PORT=8800`, `DEMO_BIND=127.0.0.1`. Then
+everything is plain HTTP at http://<name>.localhost:8800 (browsers and curl resolve `*.localhost`
+to 127.0.0.1 without DNS; Safari may not: use another browser, or add `make hosts`'s lines to
+`/etc/hosts`).
+
+To work on some of the products only, set `DEMO_PRODUCTS` there as well, e.g. `DEMO_PRODUCTS=gw,cms`
+([Only some products](#configuration-demoenv-and-demolocalenv)): the first `make up` builds fewer
+images, and the stack takes less of Docker's memory.
 
 ### Google Search and Analytics
 
@@ -201,20 +206,54 @@ the visitor's own zone and how long until the next reset; `make urls` says it to
 ## Configuration: demo.env and demo.local.env
 
 `demo.env` is the configuration. It sets the domains (the stack's and the websites') and ports,
-the certificate, the first administrator's email, the nightly reset's time, the optional component
+the certificate, the first administrator's email, the products that run (`DEMO_PRODUCTS`), the
+nightly reset's time, the optional component
 (`DEMO_PROFILES=ingestion`), the models each product uses, whether pacod-ap's starter agent is
 offered on pacod-broker (`AP_BROKER_OFFER`), the embedding backend and the log directory. Run `make up` after a change. Git
 ignores it: the first `make` copies it from `demo.env.example`, the committed template; change
 the template only for what every machine should get.
 
-`demo.local.env` holds this machine's secrets: the admin's password and the LLM provider keys.
-Git ignores it. It is read after `demo.env`, and what it sets wins:
+`demo.local.env` holds this machine's secrets, the admin's password and the LLM provider keys,
+and what this machine runs differently from `demo.env`, such as a demo on localhost or other
+products. Git ignores it. It is read after `demo.env`, and what it sets wins:
 
 ```sh
 # demo.local.env
 DEMO_ADMIN_PASSWORD=a-long-passphrase
 ANTHROPIC_API_KEY=sk-...
+# This machine runs the gateway and the CMS only, whatever demo.env says.
+DEMO_PRODUCTS=gw,cms
 ```
+
+**Only some products.** `DEMO_PRODUCTS` names the products that run, separated by commas
+without spaces: `gw`, `ap`, `cms`, `kb`, `bench`, `broker` and `agg` (or the repositories'
+names). Empty, or `all`, means every product. pacod-id and the shared layer always run. A product
+brings what it needs:
+
+- `ap` needs the gateway.
+- `kb` needs the gateway and pacod-ap, because the embeddings service comes with pacod-ap.
+- `bench` needs the gateway.
+
+For example, `DEMO_PRODUCTS=gw,cms` runs the gateway and the CMS, and `DEMO_PRODUCTS=cms` runs the
+CMS without its AI features.
+
+Set in `demo.local.env`, it applies to this machine only: a laptop can run `DEMO_PRODUCTS=cms`
+while the server's `demo.env` runs every product. An empty `DEMO_PRODUCTS=` there also wins and
+means every product; to keep `demo.env`'s choice, leave the line out of `demo.local.env` or comment
+it out.
+
+`make up` builds, starts, bootstraps and seeds only those products. It removes the other products'
+containers, but their data stays in their volumes until they come back. `make verify`, `make urls`,
+`make shots` and the home page cover only what runs. These stay as they are:
+
+- The edge keeps every product's site, so one that does not run answers 502.
+- Prometheus keeps every product's scrape jobs, so their targets show down.
+- All eight checkouts are still needed, because the shared layer mounts files from each.
+
+After changing `DEMO_PRODUCTS`, run `make up`, not `make start`: a product that comes back may need
+its images built and its credentials from the bootstrap. A baseline holds the data of the products
+that ran when it was taken. After adding one, run `make baseline`, or the nightly reset leaves that
+product's data as it is.
 
 **Optional component.** `ingestion` runs the app's document ingestion service and loads the
 starter agent's knowledge base (its corpus); without it the starter agent answers from its
@@ -321,7 +360,9 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
   app file (its own services) and a standalone file (its own copies of the shared components,
   for running it alone). [compose.yml](compose.yml) includes the eight app files unchanged; a
   small overlay per repository ([overlays/](overlays/)) only removes published ports, points
-  settings at the demo's files and sets the public addresses.
+  settings at the demo's files and sets the public addresses. The stack runs from
+  `.state/compose.yml`, a copy that [scripts/render-env.sh](scripts/render-env.sh) makes without
+  the products `DEMO_PRODUCTS` leaves out.
 - **One of each shared component** ([platform.yml](platform.yml)): one Caddy, one PostgreSQL
   (a database and owner role per product), one Qdrant, one embeddings service, one pacod-id
   (one realm for every product, [config/pacod-id.toml](config/pacod-id.toml)), one gateway, one

@@ -6,6 +6,11 @@
 # Every container is on the external network pacod-net and has a name that is unique across
 # the repositories (docs/NETWORK.md), which is what lets these files be put together unchanged.
 # The listeners only servers reach, and their callers, are on pacod-admin-net as well.
+#
+# The stack runs from a copy of this file, .state/compose.yml, which scripts/render-env.sh makes
+# without the blocks of the products demo.env's DEMO_PRODUCTS leaves out: keep one include per
+# block, blocks apart by a blank line, and overlays/<product>.yml an item of a product's path list,
+# on a line of its own. Blocks without one (the shared layer), id's and exporters' are always kept.
 name: pacod-demo
 
 include:

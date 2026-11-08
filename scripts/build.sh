@@ -8,12 +8,16 @@
 #   sh scripts/build.sh <service>...     those services: make redeploy
 #   sh scripts/build.sh --missing        only images that are not here: make up, which never
 #                                        rebuilds an image it finds
+#
+# Only the products that run (demo.env's DEMO_PRODUCTS): the Makefile's COMPOSE.
 set -eu
 cd "$(dirname "$0")/.."
 
 COMPOSE_PROFILES=$(cat .state/profiles 2>/dev/null || echo ui)
 export COMPOSE_PROFILES
-compose() { docker compose --project-directory . -f compose.yml "$@"; }
+file=.state/compose.yml
+[ -f "$file" ] || file=compose.yml
+compose() { docker compose --project-directory . -f "$file" "$@"; }
 
 missing=
 if [ "${1:-}" = --missing ]; then
