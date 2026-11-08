@@ -316,9 +316,21 @@ cms-seed: render
 
 # Every target that runs compose renders first: the env files of an older checkout can lack
 # variables the compose files now read (compose then fails on, e.g., an empty port).
-down: render
+#
+# down stops what runs, whatever demo.env and demo.local.env say now. By compose, with every
+# product's files (those DEMO_PRODUCTS no longer names too, as clean); then by the project's label
+# what compose leaves: a container of a profile that is off (make prune), and every container
+# when the configuration does not render (one being edited: an error in it must not keep the
+# stack running). The data is kept.
+down:
 	@docker rm -f pacod-demo-reset >/dev/null 2>&1 || true
-	$(COMPOSE) down --remove-orphans
+	@if [ ! -f .state/secrets.env ]; then :; \
+	elif sh scripts/render-env.sh >/dev/null; then $(COMPOSE_ALL) down --remove-orphans; \
+	else echo "down: the configuration does not render (above): stopping the containers by their label"; fi; \
+	ids=$$(docker ps -aq --filter label=com.docker.compose.project=pacod-demo); \
+	if [ -n "$$ids" ]; then docker stop $$ids >/dev/null && docker rm $$ids >/dev/null; fi; \
+	nets=$$(docker network ls -q --filter label=com.docker.compose.project=pacod-demo); \
+	if [ -n "$$nets" ]; then docker network rm $$nets >/dev/null 2>&1 || true; fi
 
 stop: down
 
