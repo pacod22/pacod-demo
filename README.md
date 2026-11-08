@@ -53,6 +53,7 @@ Everything is behind one Caddy, as host names under `DEMO_DOMAIN` (demo.env: `de
 | https://app.demo.pacod.io | the agent platform (pacod-ap): chat and its admin console |
 | https://console.demo.pacod.io | the gateway console (pacod-gw): providers, models, keys, usage |
 | https://gw.demo.pacod.io/v1 | the gateway's OpenAI-compatible API |
+| https://gw.demo.pacod.io/mcp | the gateway's governed MCP server: the approved tools of the tool servers an organisation registers (here pacod-ap's, as `pacod-ap__list_agents` and so on) that a key's bundles grant, and pacod-broker's discovery tools. It takes a gateway key, such as `TOOLS_GW_KEY` in `.state/bootstrap.env`. The gateway's A2A proxy is at `/a2a/<name>`; no service in the stack speaks A2A yet, so no remote agent is registered |
 | https://studio.demo.pacod.io | the CMS studio (pacod-cms; `DEMO_STUDIO_SUBDOMAIN`) |
 | https://cms.pacod-sites.net | a CMS demo website, "Demo Journal" (also "Demo Notes" at minimal.pacod-sites.net and "Starward", the space travels, at space.pacod-sites.net): the websites have a domain of their own, `DEMO_SITE_DOMAIN` (below), or with `DEMO_SITE_DOMAIN_SHARED=true` the demo's, cms.demo.pacod.io; the subdomains are `DEMO_CMS_SUBDOMAIN`, `DEMO_CMS_MINIMAL_SUBDOMAIN` and `DEMO_CMS_SPACE_SUBDOMAIN` |
 | https://kb.demo.pacod.io | the knowledge base (pacod-kb) |
@@ -264,6 +265,19 @@ make baseline   # ...kept as the state every nightly reset returns to
 Without the last two steps every reset puts back the older releases' data, which the products then
 migrate again at each start.
 
+`make build` rebuilds every product's image, not only the gateway's. That matters when the gateway
+and pacod-ap change together, as with registered agents. A stack whose pacod-ap image is older than
+the bootstrap would bind pacod-ap's keys to agents its calls do not name, and the gateway would
+refuse them. The gateway is built from the `../pacod-gw` checkout as it is, so check that branch
+out first.
+
+When only some services are redeployed, a gateway release goes analytics first
+(`make redeploy S="gw-analytics pacod-gw"`; pacod-gw's runbook, section 6). An older analytics
+service does not know a newer core's records (the tool calls' `/ingest/tool-calls`), and the core
+keeps them in its spool until it does. Tool servers and remote agents are reached under an egress
+list of their own, `PGW_TOOL_EGRESS_ALLOW_PRIVATE` in [overlays/gw.yml](overlays/gw.yml): `ap-api`
+and the two mocks.
+
 From the update that gave pacod-aggregator its two modes, a stack that reached the gateway keeps
 doing so, in gateway mode. A model saved on the aggregator's Settings before that is now the
 standalone mode's: enter it again there as the model in gateway mode. Until then its pages wait,
@@ -328,7 +342,7 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
   pacod-broker: a `broker_bridge` token for the bridge (`gw-broker`), pacod-id service accounts
   for the bridge (`broker.consumer`, `broker.witness`) and the core (`broker.consumer`), and one
   per gateway organisation holding `broker.provider` there, so that each organisation announces
-  its offered templates as itself. The bridge's profile is on once they exist. pacod-ap gets one
+  its offered templates and models as itself. The bridge's profile is on once they exist. pacod-ap gets one
   account holding `broker.consumer` and `broker.provider` at the platform (`BROKER_AP_TOKEN`:
   its agents' search tool, the console's Broker page, and the agents and the MCP server it
   announces at `agents.`), the CMS studio one holding `broker.consumer` (`CMS_BROKER_TOKEN`), pacod-kb
@@ -356,6 +370,31 @@ demo before, the first `make up` copies the models over from the old `pacod-demo
   the next bootstrap; the studio refuses a model the gateway does not offer, or one that cannot do
   a feature's work (alt text needs images), and the bootstrap says so. `make verify` checks that
   the studio holds the key and uses those models.
+- **The gateway's agents and tools** (pacod-gw's runbook, section 21).
+  - **Agents.** The bootstrap registers the agents of workspace pacod/pacod:
+    - `pacod-ap`, to which pacod-ap's four keys are bound. This happens only while the running
+      pacod-ap images name each call's agent ([scripts/ap-names-agents.sh](scripts/ap-names-agents.sh)).
+      An older image sends it in a way a bound key refuses, so with one its keys stay unbound
+      until `make build` and `make bootstrap`;
+    - one agent per product, `pacod-cms`, `pacod-kb` and `pacod-aggregator`, each product's key
+      bound to its own. [scripts/render-env.sh](scripts/render-env.sh) names the same agent to the
+      product (`PACOD_GW_AGENT_ID`, `AGG_GW_AGENT`).
+  - **pacod-ap's profiles.** Once the services are recreated, pacod-ap's admin API registers each
+    profile (`starter` first) as an agent and binds pacod-ap's keys to it. It does so again every
+    minute and whenever an agent is created. Each call then names its agent in `x-gw-agent-id`.
+    - In the gateway console (Workspace, Agents), switching an agent off stops its calls within a
+      second, and its chat says so. A question it answered before may still come back from
+      pacod-ap's caches, which call no model, so try the switch with a new one.
+    - A limit can count one agent's calls.
+  - **Tools** (`bootstrap.py tools`). ap-api's `/mcp` becomes the tool server `pacod-ap`:
+    - the gateway calls it with a role-less pacod-id service token of its own (`GW_AP_MCP_TOKEN`);
+    - its tools are approved as the gateway's probe sees them, a definition that changed included.
+      It is the stack's own server, so the demo gives up the hold a changed definition would get
+      elsewhere; a tool switched off in the console stays off;
+    - they go into the bundle `pacod-ap-tools`, granted to the key `pacod-tools` (`TOOLS_GW_KEY`)
+      that an MCP client of `gw./mcp` uses.
+
+    `make verify` calls them there and finds the record under Insight, Tool calls.
 - **pacod-ap's starter agent on pacod-broker.** After the bootstrap recreated the app's services,
   [scripts/broker-offer.sh](scripts/broker-offer.sh) offers the starter as `AP_BROKER_OFFER` says
   (`platform`, the default: everyone signed in to the demo's pacod-id; `public`; or empty: not

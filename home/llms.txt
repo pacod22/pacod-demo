@@ -11,8 +11,9 @@ Every person signs in through pacod-id; every model call goes through pacod-gw, 
 
 ## Products
 
-- [pacod-gw, the gateway console]({{$s}}://console.{{$d}}{{$p}}/): a high-performance gateway between applications and every LLM provider. A Rust core relays or translates every call (OpenAI, Anthropic and Gemini dialects), keeps provider keys out of the apps, routes across model pools, enforces quotas and prices each request; a SvelteKit console manages it.
+- [pacod-gw, the gateway console]({{$s}}://console.{{$d}}{{$p}}/): a high-performance gateway between applications and every LLM provider. A Rust core relays or translates every call (OpenAI, Anthropic and Gemini dialects), keeps provider keys out of the apps, routes across model pools, enforces quotas and prices each request; a SvelteKit console manages it. It also governs agents' tools: approved tools of the MCP servers an organisation registers, served on one /mcp to the keys their bundles grant, registered agents with a kill switch, and an A2A proxy (full gateway only).
 - [pacod-gw, the OpenAI-compatible API]({{$s}}://gw.{{$d}}{{$p}}/v1): the gateway's data plane; it needs a gateway key.
+- [pacod-gw, MCP]({{$s}}://gw.{{$d}}{{$p}}/mcp): the gateway's governed MCP server (POST, JSON-RPC); with a key whose tool bundles grant them, it serves pacod-ap's tools (pacod-ap__list_agents, pacod-ap__list_facts, pacod-ap__get_fact) and pacod-broker's discovery tools.
 - [pacod-cms, the studio]({{$s}}://{{$studio}}{{$p}}/): a multi-website CMS with AI-assisted content generation, translation and PDF creation, template sets, advertising and statistics. Java 25, Spring Boot, MongoDB.
 - [Demo Journal]({{$s}}://{{$cms}}{{$p}}/): a CMS demo website on the editorial template set.
 - [Demo Notes]({{$s}}://{{$minimal}}{{$p}}/): a CMS demo website on the minimal template set.

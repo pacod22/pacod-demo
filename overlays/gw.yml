@@ -49,13 +49,18 @@ services:
       PGW_ADMIN_PASSWORD: ""
       # The development mock, and the load tests' mock (pacod-gw's tester, pacod-benchmark).
       PGW_EGRESS_ALLOW_PRIVATE: gw-mock,gw-load-mock
+      # Tool servers and remote agents have their own list (organisation administrators name
+      # them, not platform ones): ap-api, whose /mcp the bootstrap registers as the tool server
+      # pacod-ap; and the two mocks, whose /mcp and /a2a gw-smoke and pacod-benchmark call.
+      PGW_TOOL_EGRESS_ALLOW_PRIVATE: ap-api,gw-mock,gw-load-mock
       PGW_CONSOLE_URL: ${GW_CONSOLE_ORIGIN}
       PGW_ID_ISSUER: ${PACOD_ID_ISSUER}
       PGW_ID_CLIENT_SECRET: ${PGW_ID_CLIENT_SECRET}
       # Installs the response cache on for every workspace, on a new database only.
       PGW_CACHE_DEFAULT_MODE: enforce
       # pacod-broker (overlays/broker.yml): models it lists at the gateway's providers become
-      # discovery proposals, templates may take pool members from it, and /mcp searches it. The
+      # discovery proposals, templates may take pool members from it, and /mcp serves its two
+      # discovery tools next to the approved tool servers' (pacod-gw runbook section 21.2). The
       # token (broker.consumer) comes from the bootstrap; until then the core leaves the broker be.
       PGW_BROKER_URL: http://pacod-broker:8060
       PGW_BROKER_TOKEN: ${PGW_BROKER_TOKEN:-}
@@ -105,8 +110,8 @@ services:
   gw-load-mock:
     ports: !reset []
 
-  # The bridge to pacod-broker (pacod-gw's profile broker): it announces the templates offered on
-  # the broker, keeps their live state, and reports how calls went. Its tokens and its file come
+  # The bridge to pacod-broker (pacod-gw's profile broker): it announces the templates and models
+  # offered on the broker, keeps their live state, and reports how calls went. Its tokens and its file come
   # from the bootstrap (scripts/bootstrap.py), so scripts/render-env.sh turns the profile on only
   # once they are there. It runs as the user who runs make, who owns the file and the token files
   # (0600) under .state/broker.

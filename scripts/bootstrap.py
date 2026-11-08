@@ -1,6 +1,7 @@
 """The full stack's bootstrap: the credentials the products need from each other.
 
     make bootstrap        (also the last step of make up)
+    bootstrap.py tools    the tools phase alone (step 9; make bootstrap runs it after the rest)
 
 Runs in the pacod-demo-tools image on pacod-net, with the repositories mounted read-only under
 /src and the demo's state under /state. Nothing here is new logic: it drives the scripts the
@@ -39,6 +40,19 @@ products already ship, pointed at the demo's files instead of a checkout's.
    and broker.provisioner at the platform for the studio's provisioner account, with which the
    studio makes each organisation's own provider account when it first offers a website.
 
+8. The gateway's agents (pacod-gw runbook section 21.3): pacod-ap's fallback agent pacod-ap, to
+   which its four keys are bound (its admin API then registers each profile and binds the keys
+   to them, make bootstrap's next step), and one agent per product, each product's key bound to
+   its own: pacod-cms, pacod-kb, pacod-aggregator. render-env.sh names the same agent to each
+   product (PACOD_GW_AGENT_ID, AGG_GW_AGENT).
+9. The tools phase (`bootstrap.py tools`, once the services are recreated, since pacod-gw must
+   allow ap-api for tool servers and ap-api must be up): ap-api's /mcp becomes the gateway's tool
+   server pacod-ap (runbook section 21.1), called with a role-less pacod-id service token of its
+   own (GW_AP_MCP_TOKEN); its tools are approved as they are (it is the stack's own server), put
+   in the workspace's bundle pacod-ap-tools, and granted to the key pacod-tools (TOOLS_GW_KEY), the
+   one an MCP client of the gateway's /mcp uses. No family service speaks A2A yet, so the
+   gateway's A2A proxy has no remote agent here.
+
 Every step keeps what still works, so a second run changes nothing. All results go to
 /state/bootstrap.env; nothing secret is printed. scripts/render-env.sh then hands them to the
 services, and `make up` recreates the ones whose settings changed.
@@ -51,6 +65,7 @@ import hashlib
 import http.cookies
 import json
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -85,6 +100,31 @@ gw.SERVICES = [
     ("pacod-aggregator", "AGG_GW_KEY", 5.0),
 ]
 
+# The products' gateway agents: each product's key is bound to its own, so that its calls are that
+# agent's whether they name it or not (render-env.sh names it all the same), with a kill switch
+# and limits of its own. A pacod-ap checkout from before registered agents has no KEY_AGENTS; the
+# keys then stay unbound, and the names the products send stay labels.
+#
+# pacod-ap's own four keys are bound (to its fallback agent, then its profiles) only while its
+# running images name each call's agent in x-gw-agent-id: make bootstrap checks them
+# (scripts/ap-names-agents.sh, AP_GW_AGENTS=1). An older image sends the profile in the body
+# alone, which a key bound to an agent refuses (403), so its keys are then left as they are until
+# its images are rebuilt. The products' keys bind either way: a key bound to one agent needs no
+# header, and older product images send none.
+AP_NAMES_AGENTS = os.environ.get("AP_GW_AGENTS") == "1"
+PRODUCT_AGENTS = [
+    ("pacod-cms", "pacod-cms", "The CMS studio's AI features (pacod-demo)"),
+    ("pacod-kb", "pacod-kb", "The knowledge base's converter and content security (pacod-demo)"),
+    ("pacod-aggregator", "pacod-aggregator", "The aggregator's reading of vendors' pages (pacod-demo)"),
+]
+if hasattr(gw, "KEY_AGENTS"):
+    if not AP_NAMES_AGENTS:
+        # Nor is its fallback agent registered: an unbound key may not name a registered agent.
+        gw.KEY_AGENTS.clear()
+        gw.AGENTS = [a for a in gw.AGENTS if a[0] != gw.FALLBACK_AGENT]
+    gw.AGENTS = [*gw.AGENTS, *PRODUCT_AGENTS]
+    gw.KEY_AGENTS.update({name: [name] for name, _, _ in PRODUCT_AGENTS})
+
 ISSUER = os.environ["PACOD_ID_ISSUER"]
 # The management API listens on pacod-admin-net alone, under this alias.
 ADMIN_URL = "http://pacod-gw-admin:8081"
@@ -102,6 +142,13 @@ BROKER_URL = "http://pacod-broker:8060"
 BROKER_ACCOUNT = "pacod-demo gw-broker"
 # The studio's AI features (pacod-cms's AiFeature), each set by CMS_AI_MODEL_<NAME>.
 CMS_AI_FEATURES = ("translate", "pdf", "assist", "vision", "design")
+# The tools phase: ap-api's MCP endpoint on pacod-net, the gateway's names for it, and the key an
+# MCP client of the gateway uses (no daily cap: tool calls cost nothing).
+AP_MCP = "http://ap-api:8000/mcp"
+TOOL_SERVER = "pacod-ap"
+TOOL_BUNDLE = "pacod-ap-tools"
+TOOLS_KEY = ("pacod-tools", "TOOLS_GW_KEY", None)
+TOOLS_ACCOUNT = "pacod-demo gw tools"
 
 
 def say(msg: str) -> None:
@@ -118,7 +165,13 @@ def gateway() -> gw.Api:
     api = gw.admin_api("dev", ADMIN_URL, ISSUER)
     gw.import_config(api, Path(str(gw.CONFIG).format(env=env)))
     gw.ensure_credentials(api, rotate=False)
-    gw.ensure_keys(api, DATA_URL)
+    if hasattr(gw, "ensure_agents"):
+        if hasattr(gw, "KEY_AGENTS") and not AP_NAMES_AGENTS:
+            say("gateway: the running pacod-ap names no agents (an older image): its keys stay unbound")
+        # The agents first: a key may name only agents the workspace has.
+        gw.ensure_keys(api, DATA_URL, gw.ensure_agents(api))
+    else:
+        gw.ensure_keys(api, DATA_URL)
     gw.ensure_admin_api_tokens(api)
     return api
 
@@ -544,8 +597,116 @@ def cms_gateway_key() -> None:
         say(f"cms: the studio refused the gateway key ({status}): {gw.short(answer)}; PACOD_GW_API_KEY applies")
 
 
+def ap_mcp_answers(token: str | None) -> int:
+    """The status ap-api's /mcp gives a ping with `token`: 200 when it takes the token."""
+    if not token:
+        return 401
+    status, _, _ = gw.request("POST", AP_MCP, token=token, body={"jsonrpc": "2.0", "id": 1, "method": "ping"})
+    return status
+
+
+def tools() -> None:
+    """ap-api's /mcp as the gateway's tool server pacod-ap (step 9 of the module's docstring)."""
+    if not hasattr(gw, "KEY_BUNDLES"):
+        say("tools: this pacod-ap checkout grants no tool bundles to keys; no tool server")
+        return
+    api = gw.admin_api("dev", ADMIN_URL, ISSUER)
+    org, ws = gw.platform_ids(api)
+
+    # The credential the gateway calls ap-api with: a pacod-id service token, no role (ap-api's
+    # /mcp asks for an active account only). A token ap-api still takes is kept.
+    token = gw.read_env(OUT).get("GW_AP_MCP_TOKEN")
+    rotated = False
+    status = ap_mcp_answers(token)
+    if status == 401:
+        ident = gw.read_env(gw.ID_ENV)
+        session = IdSession(ident["PID_BOOTSTRAP_ADMIN_EMAIL"], ident["PID_BOOTSTRAP_ADMIN_PASSWORD"])
+        token = service_token(session, TOOLS_ACCOUNT, [])
+        gw.write_env(OUT, {"GW_AP_MCP_TOKEN": token})
+        rotated = True
+        say("tools: made GW_AP_MCP_TOKEN (ap-api's /mcp, no role)")
+        status = ap_mcp_answers(token)
+    if status != 200:
+        say(f"tools: ap-api's /mcp answers {status}; no tool server this time (make bootstrap again)")
+        return
+
+    servers = f"/orgs/{org}/tool-servers"
+    wanted = {
+        "name": TOOL_SERVER,
+        "description": "pacod-ap's offered agents and their reference facts (ap-api's /mcp)",
+        "url": AP_MCP,
+        "auth": {"header": "authorization", "prefix": "Bearer "},
+        "workspaces": [ws],
+    }
+    server = api.find(servers, TOOL_SERVER)
+    if server is None:
+        status, server = api.try_call("POST", servers, wanted)
+        if status == 422 and "url" in gw.short(server):
+            say("tools: pacod-gw does not allow ap-api for tool servers (PGW_TOOL_EGRESS_ALLOW_PRIVATE, "
+                "overlays/gw.yml): make redeploy S=pacod-gw, then make bootstrap")
+            return
+        if status != 201:
+            gw.fail(f"POST {servers} answered {status}: {gw.short(server)}")
+        say(f"tools: registered the tool server {TOOL_SERVER} ({AP_MCP})")
+    elif server.get("url") != AP_MCP or server.get("workspaces") != [ws]:
+        server = api.call("PUT", f"{servers}/{server['id']}", {**server, **wanted})
+        say(f"tools: the tool server {TOOL_SERVER} points at {AP_MCP} again")
+    sid = server["id"]
+
+    creds = api.items(f"{servers}/{sid}/credentials")
+    current = [c for c in creds if c.get("state") == "current" and c.get("scope") != "workspace"]
+    if rotated or not current:
+        api.call("POST", f"{servers}/{sid}/credentials",
+                 {"label": "pacod-demo", "secret": token, "make_current": True})
+        say("tools: the tool server's credential is GW_AP_MCP_TOKEN")
+
+    # Approval: the stack's own server, so its tools are approved as the probe sees them. A tool an
+    # operator disabled stays so, and one the server no longer lists is left alone.
+    view = api.call("POST", f"{servers}/{sid}/probe")
+    probe = view.get("probe") or {}
+    if not probe.get("ok"):
+        say(f"tools: probing ap-api's /mcp failed: {probe.get('problem')}")
+        return
+    for attempt in range(2):
+        retry = False
+        for tool in view.get("tools", []):
+            if tool.get("status") not in ("new", "changed"):
+                continue
+            name, seen = tool["tool"], tool.get("seen") or {}
+            path = f"{servers}/{sid}/tools/{urllib.parse.quote(name, safe='')}/approve"
+            body = {"hash": seen.get("hash")}
+            status, answer = api.try_call("POST", path, body)
+            if status == 422:
+                # A name providers do not take as a function name (a dot, too long) needs an alias
+                # in the server's namespace; the gateway suggests none for such a tool.
+                alias = (f"{TOOL_SERVER}__" + re.sub(r"[^A-Za-z0-9_-]", "_", name))[:64]
+                status, answer = api.try_call("POST", path, {**body, "exposed_name": alias})
+            if status == 409 and attempt == 0:
+                retry = True
+                continue
+            if status not in (200, 201):
+                say(f"tools: {name} is not approved ({status}: {gw.short(answer)}); approve it in the console")
+                continue
+            say(f"tools: approved {name} ({'its definition changed' if tool['status'] == 'changed' else 'new'})")
+        if not retry:
+            break
+        view = api.call("POST", f"{servers}/{sid}/probe")
+
+    bundles = f"/orgs/{org}/workspaces/{ws}/tool-bundles"
+    if api.find(bundles, TOOL_BUNDLE) is None:
+        api.call("POST", bundles, {"name": TOOL_BUNDLE, "description": "pacod-ap's tools (pacod-demo)",
+                                   "allow": [f"mcp:{TOOL_SERVER}/*"]})
+        say(f"tools: made the bundle {TOOL_BUNDLE}")
+    # The key comes after the bundle: a key may name only bundles the workspace has.
+    gw.KEY_BUNDLES[TOOLS_KEY[0]] = [TOOL_BUNDLE]
+    gw.ensure_keys(api, DATA_URL, services=[TOOLS_KEY])
+
+
 def main() -> None:
     OUT.touch(mode=0o600, exist_ok=True)
+    if sys.argv[1:] == ["tools"]:
+        tools()
+        return
     api = gateway()
     bench(api)
     cms_provisioner()

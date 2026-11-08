@@ -92,7 +92,7 @@ own clients only.
 | `pacod-embeddings` | bge-m3 embeddings + reranker (`/embed`, `/rerank`) | 8080 | defined in ap's app file |
 | `pacod-id` | identity provider | 8070 public, 8071 internal (`pacod-id-internal` on `pacod-admin-net`), 9170 metrics | gw, ap, cms, kb, bench, broker (pacod-id: its app file) |
 | `pacod-gw` | the gateway: full core, or gw-lite in cms/kb standalone | 8080 data plane, 8081 management (`pacod-gw-admin` on `pacod-admin-net`), 9100 metrics | cms, kb (lite) (pacod-gw: its app file) |
-| `gw-mock` | the gateway's mock LLM provider | 9000 | gw (dev), cms, kb |
+| `gw-mock` | the gateway's mock LLM provider, with a mock MCP server (`/mcp`, `/mcp/legacy`) and a mock A2A agent (`/a2a`) for gw-smoke | 9000 | gw (dev), cms, kb |
 | `pacod-broker` | the discovery broker | 8060 public API, 8061 admin (`pacod-broker-admin` on `pacod-admin-net`), 9160 metrics | its app file (pacod-broker) |
 | `pacod-aggregator` | model data for the gateway | 8150 catalogue, 8151 admin (`pacod-aggregator-admin` on `pacod-admin-net`), 9150 metrics | its app file (pacod-aggregator) |
 | `pacod-mailpit` | mail sink | 1025 SMTP, 8025 web | id, gw, ap, cms, kb, bench |
@@ -123,6 +123,7 @@ The variable names stay what each product already calls them; only their default
 | pacod-aggregator, admin | `http://pacod-aggregator-admin:8151` (on `pacod-admin-net`) | agg `AGG_CONSOLE_API_URL`, `AGG_SERVER_URL` |
 | pacod-broker, public | `http://pacod-broker:8060` | gw `PGW_BROKER_URL`, `GWB_BROKER_URL`; ap `BROKER_URL`; cms `PACOD_BROKER_URL` |
 | pacod-broker, admin | `http://pacod-broker-admin:8061` (on `pacod-admin-net`) | broker `BROKER_CONSOLE_BROKERS` |
+| pacod-ap's MCP endpoint, as a gateway tool server | `http://ap-api:8000/mcp` | the gateway's tool server `pacod-ap` (scripts/bootstrap.py); reached under gw `PGW_TOOL_EGRESS_ALLOW_PRIVATE`, the tool servers' own egress list (`ap-api,gw-mock,gw-load-mock`), not `PGW_EGRESS_ALLOW_PRIVATE` |
 | PostgreSQL | `pacod-postgres:5432` | ap via `ap-pgbouncer`, kb `KB_DATABASE_HOST`, gw `DATABASE_URL`, id `PID_DATABASE_URL`, bench `DATABASE_URL` |
 | Qdrant | `http://pacod-qdrant:6333` | ap and kb `QDRANT_URL` |
 | Embeddings | `http://pacod-embeddings:8080` | ap `EMBEDDINGS_URL`; kb `EMBEDDINGS_URL` (unset: in-process model) |

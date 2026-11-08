@@ -27,7 +27,7 @@ COMPOSE = COMPOSE_PROFILES=$$(cat .state/profiles 2>/dev/null || echo ui) docker
 TOOLS_RUN = docker run --rm --network pacod-net --network pacod-admin-net --user $$(id -u):$$(id -g) \
 	-v "$(CURDIR):/work" -v "$(CURDIR)/.state:/state" \
 	-v "$(CURDIR)/../pacod-ap:/src/pacod-ap:ro" -v "$(CURDIR)/../pacod-cms:/src/pacod-cms:ro" \
-	--env-file .state/env/stack.env $(TOOLS)
+	--env-file .state/env/stack.env -e AP_GW_AGENTS $(TOOLS)
 # The app's services that read the bootstrap's credentials (and the products' that read theirs).
 RECREATE := ap-api ap-admin-api ap-improvement-loop-worker ap-newsletter-worker cms-studio kb-pipeline \
 	bench-api pacod-gw pacod-aggregator
@@ -100,6 +100,10 @@ start: network render
 redeploy: network render
 	@test -n "$(S)" || { echo 'usage: make redeploy S="<service> [<service>...]"' >&2; exit 1; }
 	@sh scripts/build.sh $(S)
+	@# pacod-gw's order (its runbook, section 6): the analytics service before the core, so that it
+	@# knows a release's new event fields and tables (/ingest/tool-calls) before the core sends them.
+	@case " $(S) " in *" gw-analytics "*) $(COMPOSE) up -d --no-deps --no-build $(WAIT) gw-analytics;; \
+		*" pacod-gw "*) echo "redeploy: pacod-gw without gw-analytics; after a gateway release, redeploy both (S=\"gw-analytics pacod-gw\")";; esac
 	$(COMPOSE) up -d --no-deps --no-build $(WAIT) $(S)
 
 restart: render
@@ -148,15 +152,25 @@ init: tools
 render: demo.env
 	@sh scripts/render-env.sh
 
-# The cross-product credentials (gateway keys, service tokens), then the services that read them
-# are recreated with the new values (compose recreates only those whose settings changed). Last,
-# pacod-ap's starter agent is offered on pacod-broker as demo.env's AP_BROKER_OFFER says.
+# The cross-product credentials (gateway keys and agents, service tokens), then the services that
+# read them are recreated with the new values (compose recreates only those whose settings
+# changed). Then pacod-ap's admin API registers its agents (profiles) in the gateway and binds
+# pacod-ap's keys to them, and the tools phase registers ap-api's /mcp as the gateway's tool
+# server pacod-ap: both need the recreated services. Last, pacod-ap's starter agent is offered on
+# pacod-broker as demo.env's AP_BROKER_OFFER says.
 bootstrap: network tools render
-	@$(TOOLS_RUN) python3 -I /work/scripts/bootstrap.py
+	@# pacod-ap's keys are bound to its agents only while its running images name each call's
+	@# agent (scripts/ap-names-agents.sh); an older image keeps them unbound until make build.
+	@AP_GW_AGENTS=$$(sh scripts/ap-names-agents.sh); export AP_GW_AGENTS; \
+		$(TOOLS_RUN) python3 -I /work/scripts/bootstrap.py
 	@sh scripts/render-env.sh
 	$(COMPOSE) up -d --no-deps $(WAIT) $(RECREATE)
 	@# pacod-gw's bridge to pacod-broker: its profile is on once the bootstrap made its tokens.
 	@if grep -q broker .state/profiles; then $(COMPOSE) up -d --no-deps $(WAIT) gw-broker; fi
+	@if docker exec ap-admin-api python -c 'import admin_api.services.gateway_agent_sync' >/dev/null 2>&1; then \
+		docker exec ap-admin-api python -m admin_api.services.gateway_agent_sync once; \
+	else echo "bootstrap: the running pacod-ap registers no gateway agents (an older image); make build, then make bootstrap"; fi
+	@$(TOOLS_RUN) python3 -I /work/scripts/bootstrap.py tools
 	@sh scripts/broker-offer.sh
 
 # The app's own seed (pacod-ap's bootstrap-local): tables, the starter agent's facts, dev users,
@@ -330,6 +344,7 @@ urls: render
 	echo "  App (pacod-ap)              $$AP_ORIGIN"; \
 	echo "  Gateway console (pacod-gw)  $$GW_CONSOLE_ORIGIN"; \
 	echo "  Gateway API (OpenAI)        $$GW_API_ORIGIN/v1"; \
+	echo "  Gateway MCP (tools)         $$GW_API_ORIGIN/mcp (TOOLS_GW_KEY in .state/bootstrap.env)"; \
 	echo "  CMS studio (pacod-cms)      $$CMS_STUDIO_ORIGIN"; \
 	echo "  CMS demo website            $$CMS_DEMO_ORIGIN"; \
 	echo "  CMS minimal website         $$CMS_MINIMAL_ORIGIN"; \

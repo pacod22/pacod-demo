@@ -446,7 +446,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 					<div class="head"><span class="badge">GW</span><h3>pacod-gw</h3></div>
 					<div class="role">AI gateway</div>
 					<p class="pitch">A first-class, high-performance gateway between your applications and every LLM provider, built for performance, scalability, flexibility, advanced monitoring and ease of use.</p>
-					<p>A Rust core relays or translates every call, keeps provider keys out of the apps, enforces quotas and prices each request. A SvelteKit console manages all of it. In the demo, every product's model calls go through it. With no provider key set, its mock provider answers.</p>
+					<p>A Rust core relays or translates every call, keeps provider keys out of the apps, enforces quotas and prices each request. A SvelteKit console manages all of it. In the demo, every product's model calls go through it. With no provider key set, its mock provider answers. Agents reach their tools through it too: pacod-ap's tools are served on its governed MCP endpoint.</p>
 					<ul class="stack"><li>Rust</li><li>Tokio &amp; hyper</li><li>PostgreSQL</li><li>ClickHouse</li><li>Valkey</li><li>SvelteKit</li></ul>
 					<div class="links">
 						<div class="label">In this demo</div>
@@ -454,6 +454,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 							<a class="btn primary" href="{{$s}}://console.{{$d}}{{$p}}/">Console <span class="host">console.{{$d}}</span></a>
 						</div>
 						<div class="ext">OpenAI-compatible API: <code>{{$s}}://gw.{{$d}}{{$p}}/v1</code> (with a gateway key)</div>
+						<div class="ext">MCP: <code>{{$s}}://gw.{{$d}}{{$p}}/mcp</code> (with a key its tool bundles grant)</div>
 						<div class="ext"><a href="https://ai.pacod.io/projects/pacod-gw">Project page</a> · <a href="https://github.com/pacod22/pacod-gw">Repository</a></div>
 					</div>
 				</div>
@@ -469,6 +470,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 					<li><strong>Flexibility</strong><span>OpenAI (chat and Responses), Anthropic (in full) and Gemini dialects, translated in every direction. Beyond chat: embeddings, speech, images, transcription, rerank, Realtime sessions, and files and batches. Providers include OpenAI, Anthropic, Gemini and Vertex AI, DeepSeek, GLM, Kimi, Groq, Cohere, Jina, Voyage and Ollama. Proxy mode forwards content byte for byte, WebSockets included, and managed mode adds templates.</span></li>
 					<li><strong>Smart routing</strong><span>Model pools with priority, weighted, round-robin, least-busy, lowest-latency or cheapest routing. Calls fail over before the first byte, circuit breakers isolate failing models, and session affinity keeps prompt caches warm.</span></li>
 					<li><strong>Advanced monitoring</strong><span>The delay the gateway adds is measured and stored for every call. Usage, tokens and cost go to ClickHouse, with Prometheus metrics, Grafana dashboards and alerts, and an audit mode that keeps complete requests and responses.</span></li>
+					<li><strong>Tools and agents</strong><span>MCP servers an organisation registers are probed, and each tool's definition is approved and pinned: a server that changes a description later has it held until it is approved again. A key's bundles decide which tools it sees on one governed <code>/mcp</code>, in the 2026-07-28 and 2025 revisions of MCP. Every tool call is recorded, and limits count tool calls. Agents are registered too, each with its own models, tools, limits and a kill switch. Remote A2A agents are reached through the gateway with their tasks kept apart per workspace. These are in the full gateway; lite serves models only.</span></li>
 					<li><strong>Usability</strong><span>One console for models, templates, keys, versioned prices, quotas and reports, down to what the response cache saved. Changes take effect live, without a restart. A built-in tester runs test cases and load tests against the gateway.</span></li>
 				</ul>
 			</article>
@@ -645,7 +647,7 @@ gtag('js',new Date());gtag('config','{{$gtag}}');</script>
 					<div class="head"><span class="badge">BR</span><h3>pacod-broker</h3></div>
 					<div class="role">Discovery &amp; reputation</div>
 					<p>A catalogue of what can be called: models, MCP servers, agents and compute, each with its prices and availability over time and a reputation for its provider. Providers announce under leases, so what stops renewing disappears by itself; consumers search in under a millisecond.</p>
-					<p>Here pacod-gw offers its templates on the broker, takes models the broker lists at its providers as discovery proposals, and confirms how calls with a broker ticket went.</p>
+					<p>Here pacod-gw offers its templates and models on the broker, takes models the broker lists at its providers as discovery proposals, and confirms how calls with a broker ticket went.</p>
 					<ul class="stack"><li>Rust</li><li>axum</li><li>pacod-id</li><li>SvelteKit</li><li>MCP</li></ul>
 					<div class="links">
 						<div class="btns">
