@@ -479,6 +479,9 @@ LOG_DIR_HOST=$log_dir/cms
 APP_LOG_LEVEL=$log_level
 APP_LOG_FORMAT=$log_format
 PACOD_GW_API_KEY=${CMS_GW_KEY:-}
+# The gateway agent its key is bound to (scripts/bootstrap.py); the two must agree, or the
+# gateway refuses the call.
+PACOD_GW_AGENT_ID=pacod-cms
 PACOD_AI_MODEL=$CMS_AI_MODEL
 PACOD_ID_PROVISIONER_TOKEN=${PACOD_ID_PROVISIONER_TOKEN:-}
 # pacod-broker: reputation and the broker's models on the installation screen (CMS_BROKER_TOKEN,
@@ -499,6 +502,7 @@ KB_DATA=kb-data
 KB_MODEL_CACHE=pacod-hf-cache
 EMBEDDINGS_URL=http://pacod-embeddings:8080
 PACOD_GW_API_KEY=${KB_GW_KEY:-}
+PACOD_GW_AGENT_ID=pacod-kb
 LLM_CONVERTER_ENABLED=false
 LLM_CONVERTER_MODEL=$KB_LLM_MODEL
 CONTENT_SECURITY_LLM_MODEL=$KB_LLM_MODEL
@@ -538,6 +542,7 @@ AGG_LLM_MAX_TOKENS_FIELD=${AGG_LLM_MAX_TOKENS_FIELD:-}
 AGG_GW_URL=http://pacod-gw:8080/v1
 AGG_GW_KEY=${AGG_GW_KEY:-}
 AGG_GW_MODEL=$agg_gw_model
+AGG_GW_AGENT=pacod-aggregator
 EOF
 
 # ---- pacod-ap ---------------------------------------------------------------------------------

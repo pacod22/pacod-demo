@@ -87,6 +87,14 @@ def section(title: str) -> None:
     print(f"\n{title}", flush=True)
 
 
+# The agent a product's call names. pacod-ap's keys speak for several registered agents (its
+# profiles and pacod-ap, its calls outside a profile), so each call names one; the other products'
+# keys are bound to one agent each and need not (scripts/bootstrap.py).
+AGENT_HEADERS = {"pacod-ap": {"x-gw-agent-id": "pacod-ap"}}
+# The gateway's names for ap-api's tools: the tool server pacod-ap's (scripts/bootstrap.py).
+TOOL_PREFIX = "pacod-ap__"
+
+
 # ---- 1. The edge: every public address answers through pacod-caddy -------------------------------
 def edge() -> None:
     section("edge (pacod-caddy, through the public names)")
@@ -289,7 +297,7 @@ def gateway() -> None:
         if not key:
             report(False, f"{product}: key", f"{var} is not in .state/bootstrap.env (make bootstrap)")
             continue
-        auth = {"Authorization": f"Bearer {key}"}
+        auth = {"Authorization": f"Bearer {key}", **AGENT_HEADERS.get(product, {})}
         status, body, _ = http("GET", "http://pacod-gw:8080/v1/models", headers=auth)
         n = len(body.get("data", [])) if isinstance(body, dict) else 0
         report(status == 200 and n > 0, f"{product}: lists models", f"{status}, {n} models")
@@ -337,7 +345,7 @@ def response_cache(key: str | None, model: str) -> None:
     the provider and is not kept."""
     if not key:
         return
-    auth = {"Authorization": f"Bearer {key}"}
+    auth = {"Authorization": f"Bearer {key}", **AGENT_HEADERS["pacod-ap"]}
     body = {"model": model, "temperature": 0,
             "messages": [{"role": "user", "content": f"Remember this answer (verify {uuid.uuid4().hex[:8]})."}]}
     # One reply for each call that may reach the mock; what is left is removed below, so that no
@@ -372,6 +380,126 @@ def response_cache(key: str | None, model: str) -> None:
     report(result == "hit" and attempts == "0" and same, "response cache: the repeated call is a hit (gw-valkey)",
            f"{status}, x-gw-cache {result}, {attempts} attempts, age {hdrs.get('Age') if hdrs else None} s"
            + ("" if same or status != 200 else ", another answer"))
+
+
+# ---- 4b. Tools and agents: the gateway's /mcp, its tool server pacod-ap, registered agents --------
+MCP = "http://pacod-gw:8080/mcp"
+GW_ADMIN = "http://pacod-gw-admin:8081/api/v1"
+MODERN = "2026-07-28"
+
+
+def mcp(key: str, method: str, params: dict | None = None, *, modern: bool = False, name: str | None = None,
+        headers: dict | None = None):
+    """One JSON-RPC request to the gateway's /mcp: the 2025 revisions' way, or 2026-07-28's, whose
+    headers must say what the body says (pacod-gw runbook section 21.2)."""
+    params = dict(params or {})
+    h = {"Authorization": f"Bearer {key}", "Accept": "application/json", **(headers or {})}
+    if modern:
+        params["_meta"] = {"io.modelcontextprotocol/protocolVersion": MODERN}
+        h |= {"MCP-Protocol-Version": MODERN, "Mcp-Method": method}
+        if name:
+            h["Mcp-Name"] = name
+    body = {"jsonrpc": "2.0", "id": 1, "method": method}
+    if params:
+        body["params"] = params
+    return http("POST", MCP, headers=h, body=body)
+
+
+def result_of(body) -> dict:
+    return body.get("result", {}) if isinstance(body, dict) and isinstance(body.get("result"), dict) else {}
+
+
+def tools() -> None:
+    section("tools and agents (pacod-gw: /mcp, the tool server pacod-ap, registered agents)")
+    creds = gw.read_env(Path("/state/bootstrap.env"))
+    key = creds.get("TOOLS_GW_KEY")
+    trace = f"verify-{uuid.uuid4().hex[:12]}"
+    if not key:
+        report(False, "the tools key", "TOOLS_GW_KEY is not in .state/bootstrap.env (make bootstrap)")
+    else:
+        status, body, hdrs = mcp(key, "initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
+                                                     "clientInfo": {"name": "pacod-demo verify", "version": "1"}})
+        server = result_of(body).get("serverInfo", {}).get("name")
+        session = hdrs.get("Mcp-Session-Id") if hdrs else None
+        report(status == 200 and server == "pacod-gw" and not session,
+               "/mcp: the gateway answers initialize itself, keeping no session", f"{status}, {server}")
+        status, body, _ = mcp(key, "tools/list")
+        names = sorted(t.get("name", "") for t in result_of(body).get("tools", []))
+        want = {f"{TOOL_PREFIX}{t}" for t in ("list_agents", "list_facts", "get_fact")}
+        report(want <= set(names), "/mcp: the key's bundle grants pacod-ap's approved tools",
+               f"{status}, {', '.join(names) or 'none'}" + ("" if want <= set(names) else ": make bootstrap"))
+        status, body, _ = mcp(key, "tools/call", {"name": f"{TOOL_PREFIX}list_agents", "arguments": {}},
+                              headers={"x-gw-trace": trace})
+        res = result_of(body)
+        ok = status == 200 and isinstance(res.get("content"), list) and not res.get("isError")
+        report(ok, "/mcp: pacod-ap__list_agents is called at ap-api, with the gateway's credential",
+               f"{status}" + ("" if ok else f" {str(body)[:120]}"))
+        status, body, _ = mcp(key, "tools/list", modern=True)
+        kind = result_of(body).get("resultType")
+        report(status == 200 and kind == "complete", f"/mcp: the {MODERN} revision", f"{status}, resultType {kind}")
+        status, _, _ = http("GET", MCP, headers={"Authorization": f"Bearer {key}"})
+        report(status == 405, "/mcp: GET is refused (no streams, no sessions)", str(status))
+        status, _, _ = http("POST", "http://pacod-gw:8080/a2a/nobody",
+                            headers={"Authorization": f"Bearer {key}", "A2A-Version": "1.0"},
+                            body={"jsonrpc": "2.0", "id": 1, "method": "GetTask", "params": {"id": "x"}})
+        report(status == 404, "/a2a: no remote agent is granted (none in the stack speaks A2A)", str(status))
+    kb_key = creds.get("KB_GW_KEY")
+    if kb_key:
+        status, body, _ = mcp(kb_key, "tools/list")
+        names = [t.get("name", "") for t in result_of(body).get("tools", [])]
+        theirs = [n for n in names if n.startswith(TOOL_PREFIX)]
+        report(status == 200 and not theirs, "/mcp: a key without the bundle sees none of pacod-ap's tools",
+               f"{status}, {len(names)} tools ({', '.join(names) or 'none'})")
+
+    admin = creds.get("GW_ADMIN_TOKEN")
+    if not admin:
+        report(False, "agents: the admin token", "GW_ADMIN_TOKEN is not in .state/bootstrap.env (make bootstrap)")
+        return
+    auth = {"Authorization": f"Bearer {admin}"}
+
+    def items(path: str, field: str = "items") -> tuple[int, list]:
+        status, body, _ = http("GET", GW_ADMIN + path, headers=auth)
+        return status, (body.get(field, []) if isinstance(body, dict) else [])
+
+    _, orgs = items("/orgs")
+    org = next((o["id"] for o in orgs if o.get("name") == "pacod"), None)
+    _, spaces = items(f"/orgs/{org}/workspaces") if org else (0, [])
+    ws = next((w["id"] for w in spaces if w.get("name") == "pacod"), None)
+    if not ws:
+        report(False, "agents: the workspace pacod/pacod", "not found (make bootstrap)")
+        return
+    status, agents = items(f"/orgs/{org}/workspaces/{ws}/agents")
+    names = {a.get("name") for a in agents}
+    want = {"pacod-ap", "starter", "pacod-kb", "pacod-cms", "pacod-aggregator"}
+    report(status == 200 and want <= names, "agents: pacod-ap, its starter profile and the products are registered",
+           f"{status}, {', '.join(sorted(n for n in names if n)) or 'none'}"
+           + ("" if want <= names else f"; missing {', '.join(sorted(want - names))}: make bootstrap"))
+    _, keys = items(f"/orgs/{org}/workspaces/{ws}/keys")
+    ap_key = next((k for k in keys if k.get("name") == "pacod-api"), {})
+    bound = ap_key.get("agents", [])
+    report("starter" in bound and "pacod-ap" in bound, "agents: pacod-ap's key speaks for them",
+           ", ".join(bound) or "no agents")
+    secret = creds.get("GATEWAY_KEY_API")
+    if secret and len(bound) > 1:
+        bare, _, _ = http("GET", "http://pacod-gw:8080/v1/models", headers={"Authorization": f"Bearer {secret}"})
+        named, _, _ = http("GET", "http://pacod-gw:8080/v1/models",
+                           headers={"Authorization": f"Bearer {secret}", "x-gw-agent-id": "starter"})
+        report(bare == 403 and named == 200, "agents: a call of that key names its agent",
+               f"without x-gw-agent-id {bare}, as starter {named}")
+
+    if key:
+        # The record of the call above reaches the analytics service through the core's spool.
+        found = None
+        for _ in range(15):
+            _, calls = items(f"/tool-calls?workspace_id={ws}&trace_id={trace}&limit=5", "tool_calls")
+            found = next((c for c in calls if c.get("exposed_name") == f"{TOOL_PREFIX}list_agents"), None)
+            if found:
+                break
+            time.sleep(2)
+        report(bool(found) and found.get("verdict") == "allowed" and found.get("target") == "pacod-ap",
+               "tool calls: the call is recorded (Insight, Tool calls)",
+               f"{found.get('verdict')}, {found.get('status')}, {found.get('total_ms', '?')} ms" if found
+               else "no record within 30 s")
 
 
 # ---- 5. The app: one streamed chat turn -----------------------------------------------------------
@@ -600,7 +728,8 @@ def aggregator() -> None:
 
 
 def main() -> None:
-    only = sys.argv[1:] or ["edge", "health", "sso", "gateway", "app", "kb", "cms", "bench", "broker", "aggregator"]
+    only = sys.argv[1:] or ["edge", "health", "sso", "gateway", "tools", "app", "kb", "cms", "bench", "broker",
+                            "aggregator"]
     for name in only:
         globals()[name]()
     print()
