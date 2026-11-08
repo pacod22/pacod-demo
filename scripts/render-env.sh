@@ -107,8 +107,9 @@ if [ "$sd" != localhost ] && [ "$d" != localhost ]; then
 fi
 if [ "$shared" = true ] && [ "$site_domain_shared" != true ]; then
 	echo "render-env: the CMS's websites (*.$sd) would share the domain of $studio.$d and id.$d, and the" \
-		"studio refuses to start then: set DEMO_SITE_DOMAIN in demo.env to a domain of its own, or" \
-		"DEMO_SITE_DOMAIN_SHARED=true to accept that (demo.env.example)" >&2
+		"studio refuses to start then: set DEMO_SITE_DOMAIN (demo.env, or demo.local.env for this machine)" \
+		"to another registrable domain, or DEMO_SITE_DOMAIN_SHARED=true over HTTPS to accept that" \
+		"(demo.env.example)" >&2
 	exit 1
 fi
 if [ "$site_domain_shared" = true ] && [ "$d" != localhost ]; then
