@@ -63,6 +63,50 @@ esac
 # Python's spelling (pacod-ap's APP_LOG_LEVEL).
 log_level_upper=$(printf %s "$log_level" | tr '[:lower:]' '[:upper:]')
 
+# The products that run (demo.env's DEMO_PRODUCTS), by the names of their overlays: empty or `all`,
+# every one. pacod-id and the shared layer always run. A product brings what it cannot run without:
+# compose refuses a depends_on on a service the project lacks, even one with required: false, and
+# kb-pipeline depends on pacod-gw and on pacod-embeddings, which comes with pacod-ap, bench-api on
+# the gateway's load agent; pacod-ap makes every model call through the gateway.
+all_products="gw ap cms kb bench broker agg"
+products=
+# (Not $p: that is the HTTP port.)
+for name in $(printf %s "${DEMO_PRODUCTS:-all}" | tr '[:upper:],' '[:lower:] '); do
+	name=${name#pacod-}
+	case $name in
+		all) products=$all_products ;;
+		id) ;;
+		benchmark) products="$products bench" ;;
+		aggregator) products="$products agg" ;;
+		gw | ap | cms | kb | bench | broker | agg) products="$products $name" ;;
+		*) echo "render-env: DEMO_PRODUCTS (demo.env or demo.local.env) names $name, which is not a product: gw, ap, cms, kb, bench, broker," \
+			"agg (or pacod-gw, ..., pacod-benchmark, pacod-aggregator), all, or id, which always runs" >&2
+			exit 1 ;;
+	esac
+done
+runs() { case " $products " in *" $1 "*) ;; *) return 1 ;; esac; }
+also=
+needs() { # needs PRODUCT OTHER...: PRODUCT runs with the others only
+	product=$1
+	shift
+	runs "$product" || return 0
+	for other in "$@"; do
+		if ! runs "$other"; then
+			products="$products $other"
+			also="$also $other (for $product)"
+		fi
+	done
+}
+needs kb gw ap
+needs ap gw
+needs bench gw
+if [ -n "$also" ]; then echo "render-env: DEMO_PRODUCTS runs$also too"; fi
+# In the order of compose.yml, pacod-id first.
+selected=id
+for name in $all_products; do
+	if runs "$name"; then selected="$selected $name"; fi
+done
+
 d=$DEMO_DOMAIN
 # The CMS's subdomains (demo.env): the studio's under DEMO_DOMAIN, the three demo websites' under
 # DEMO_SITE_DOMAIN. One DNS label each.
@@ -100,40 +144,43 @@ case $site_domain_shared in
 	true | false) ;;
 	*) echo "render-env: DEMO_SITE_DOMAIN_SHARED=$site_domain_shared is not true or false" >&2; exit 1 ;;
 esac
-shared=false
-if [ "$sd" != localhost ] && [ "$d" != localhost ]; then
-	case $sd in "$d" | *."$d") shared=true ;; esac
-	case $d in *."$sd") shared=true ;; esac
-fi
-if [ "$shared" = true ] && [ "$site_domain_shared" != true ]; then
-	echo "render-env: the CMS's websites (*.$sd) would share the domain of $studio.$d and id.$d, and the" \
-		"studio refuses to start then: set DEMO_SITE_DOMAIN (demo.env, or demo.local.env for this machine)" \
-		"to another registrable domain, or DEMO_SITE_DOMAIN_SHARED=true over HTTPS to accept that" \
-		"(demo.env.example)" >&2
-	exit 1
-fi
-if [ "$site_domain_shared" = true ] && [ "$d" != localhost ]; then
-	# Shared on purpose: only over HTTPS, where the studio's and pacod-id's cookies are __Host-
-	# cookies a website's script cannot set.
-	if [ -z "${DEMO_TLS_CERT:-}${DEMO_TLS_KEY:-}" ]; then
-		echo "render-env: DEMO_SITE_DOMAIN_SHARED=true needs HTTPS (DEMO_TLS_CERT, DEMO_TLS_KEY): over plain HTTP" \
-			"the websites could set the cookies the studio and the sign-in receive" >&2
+# Only with the CMS (DEMO_PRODUCTS): without it there is neither a studio nor a website.
+if runs cms; then
+	shared=false
+	if [ "$sd" != localhost ] && [ "$d" != localhost ]; then
+		case $sd in "$d" | *."$d") shared=true ;; esac
+		case $d in *."$sd") shared=true ;; esac
+	fi
+	if [ "$shared" = true ] && [ "$site_domain_shared" != true ]; then
+		echo "render-env: the CMS's websites (*.$sd) would share the domain of $studio.$d and id.$d, and the" \
+			"studio refuses to start then: set DEMO_SITE_DOMAIN (demo.env, or demo.local.env for this machine)" \
+			"to another registrable domain, or DEMO_SITE_DOMAIN_SHARED=true over HTTPS to accept that" \
+			"(demo.env.example)" >&2
 		exit 1
 	fi
-fi
-# On the very domain (localhost's default, or shared on purpose), a website's subdomain must not be
-# one the edge already routes: Caddy's own site would hide the website, and the demo websites are
-# created at these hosts unchecked.
-if [ "$sd" = "$d" ]; then
-	for h in "$cms" "$minimal" "$space"; do
-		for taken in "$studio" id app chat console gw kb bench broker broker-api agg agg-api agents grafana mail prometheus; do
-			[ "$h" != "$taken" ] || {
-				echo "render-env: the CMS website subdomain $h.$d is already the edge's ($taken):" \
-					"choose another DEMO_CMS_SUBDOMAIN, DEMO_CMS_MINIMAL_SUBDOMAIN or DEMO_CMS_SPACE_SUBDOMAIN" >&2
-				exit 1
-			}
+	if [ "$site_domain_shared" = true ] && [ "$d" != localhost ]; then
+		# Shared on purpose: only over HTTPS, where the studio's and pacod-id's cookies are __Host-
+		# cookies a website's script cannot set.
+		if [ -z "${DEMO_TLS_CERT:-}${DEMO_TLS_KEY:-}" ]; then
+			echo "render-env: DEMO_SITE_DOMAIN_SHARED=true needs HTTPS (DEMO_TLS_CERT, DEMO_TLS_KEY): over plain HTTP" \
+				"the websites could set the cookies the studio and the sign-in receive" >&2
+			exit 1
+		fi
+	fi
+	# On the very domain (localhost's default, or shared on purpose), a website's subdomain must not be
+	# one the edge already routes: Caddy's own site would hide the website, and the demo websites are
+	# created at these hosts unchecked.
+	if [ "$sd" = "$d" ]; then
+		for h in "$cms" "$minimal" "$space"; do
+			for taken in "$studio" id app chat console gw kb bench broker broker-api agg agg-api agents grafana mail prometheus; do
+				[ "$h" != "$taken" ] || {
+					echo "render-env: the CMS website subdomain $h.$d is already the edge's ($taken):" \
+						"choose another DEMO_CMS_SUBDOMAIN, DEMO_CMS_MINIMAL_SUBDOMAIN or DEMO_CMS_SPACE_SUBDOMAIN" >&2
+					exit 1
+				}
+			done
 		done
-	done
+	fi
 fi
 p=$DEMO_HTTP_PORT
 hp=${DEMO_HTTPS_PORT:-443}
@@ -285,49 +332,6 @@ case $broker_url in
 esac
 broker_url=${broker_url%/}
 
-# The products that run (demo.env's DEMO_PRODUCTS), by the names of their overlays: empty or `all`,
-# every one. pacod-id and the shared layer always run. A product brings what it cannot run without:
-# compose refuses a depends_on on a service the project lacks, even one with required: false, and
-# kb-pipeline depends on pacod-gw and on pacod-embeddings, which comes with pacod-ap, bench-api on
-# the gateway's load agent; pacod-ap makes every model call through the gateway.
-all_products="gw ap cms kb bench broker agg"
-products=
-# (Not $p: that is the HTTP port.)
-for name in $(printf %s "${DEMO_PRODUCTS:-all}" | tr '[:upper:],' '[:lower:] '); do
-	name=${name#pacod-}
-	case $name in
-		all) products=$all_products ;;
-		id) ;;
-		benchmark) products="$products bench" ;;
-		aggregator) products="$products agg" ;;
-		gw | ap | cms | kb | bench | broker | agg) products="$products $name" ;;
-		*) echo "render-env: DEMO_PRODUCTS (demo.env or demo.local.env) names $name, which is not a product: gw, ap, cms, kb, bench, broker," \
-			"agg (or pacod-gw, ..., pacod-benchmark, pacod-aggregator), all, or id, which always runs" >&2
-			exit 1 ;;
-	esac
-done
-runs() { case " $products " in *" $1 "*) ;; *) return 1 ;; esac; }
-also=
-needs() { # needs PRODUCT OTHER...: PRODUCT runs with the others only
-	product=$1
-	shift
-	runs "$product" || return 0
-	for other in "$@"; do
-		if ! runs "$other"; then
-			products="$products $other"
-			also="$also $other (for $product)"
-		fi
-	done
-}
-needs kb gw ap
-needs ap gw
-needs bench gw
-if [ -n "$also" ]; then echo "render-env: DEMO_PRODUCTS runs$also too"; fi
-# In the order of compose.yml, pacod-id first.
-selected=id
-for name in $all_products; do
-	if runs "$name"; then selected="$selected $name"; fi
-done
 # The admin's roles at pacod-id. PID_BOOTSTRAP_ADMIN_ROLES names every product's, given when the
 # account is made, and stays so: pacod-id is not recreated when the products change. Those of the
 # products that run are DEMO_ADMIN_ROLES, which the bootstrap gives an account that lacks one and

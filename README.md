@@ -116,6 +116,7 @@ needs:
   Or `DEMO_SITE_DOMAIN_SHARED=true`, for a demo whose websites are all trusted: the websites then
   answer under `DEMO_DOMAIN` itself (`cms.demo.pacod.io`), the studio starts with a warning, and
   the certificate and DNS need no other name. Over HTTPS only (demo.env.example says what it costs).
+  Without the CMS ([Only some products](#configuration-demoenv-and-demolocalenv)) neither is needed.
 - **DNS:** `demo.pacod.io`, `*.demo.pacod.io` and `*.pacod-sites.net` pointing at the server.
   Before the DNS is set, `make hosts` prints `/etc/hosts` lines to try it on the server itself, and
   `make hosts ADDR=<the server's address>` the lines for another machine.
@@ -298,7 +299,9 @@ it out.
 
 `make up` builds, starts, bootstraps and seeds only those products. It removes the other products'
 containers, but their data stays in their volumes until they come back. `make verify`, `make urls`,
-`make shots` and the home page cover only what runs. These stay as they are:
+`make shots` and the home page cover only what runs. Without the CMS, neither `make up` nor
+`make preflight` checks its websites' domain (`DEMO_SITE_DOMAIN`), and the certificate only needs
+to cover `*.DEMO_DOMAIN`. These stay as they are:
 
 - The edge keeps every product's site, so one that does not run answers 502.
 - Prometheus keeps every product's scrape jobs, so their targets show down.
