@@ -75,7 +75,8 @@ help:
 	@echo "  make cms-space create the CMS's Starward website (magazine design) on a stack without it"
 	@echo "  make cms-seed SITE=<id> [DEMO=space]   the demo content into a CMS website without articles"
 	@echo "  make google    write Starward's Google settings (demo.env) into the CMS again"
-	@echo "  make hosts     /etc/hosts lines (Safari and *.localhost, or a domain before its DNS)"
+	@echo "  make hosts     /etc/hosts lines (Safari and *.localhost, or a domain before its DNS;"
+	@echo "                 ADDR=<the server's address>: for the other machines on a local network)"
 	@echo "  make shots     retake the home page's screenshots from the running stack"
 
 # ---- run ------------------------------------------------------------------------------------------
@@ -424,12 +425,22 @@ shots: network render
 	@docker run --rm --network pacod-net --user $$(id -u):$$(id -g) -e HOME=/tmp \
 		-v "$(CURDIR):/work" --env-file .state/env/stack.env $(SHOTS) python3 -I /work/scripts/shots.py
 
+# /etc/hosts lines for the host names the edge answers: at 127.0.0.1, for this machine, or at
+# ADDR=<the server's address>, for the other machines of a demo on a local server without DNS.
+# Not for a demo on localhost: browsers send *.localhost to their own machine whatever /etc/hosts
+# says, so another machine reaches it through an SSH tunnel (README).
 hosts:
-	@set -a; . ./demo.env; [ ! -f demo.local.env ] || . ./demo.local.env; set +a; \
+	@addr="$(or $(ADDR),127.0.0.1)"; \
+	case $$addr in *[!0-9A-Fa-f.:]*) echo "hosts: ADDR=$$addr is not an IP address" >&2; exit 2 ;; esac; \
+	set -a; . ./demo.env; [ ! -f demo.local.env ] || . ./demo.local.env; set +a; \
+	case $$addr:$$DEMO_DOMAIN in 127.*:localhost | ::1:localhost) ;; *:localhost) \
+		echo "hosts: DEMO_DOMAIN is localhost, which browsers resolve to their own machine whatever" \
+			"/etc/hosts says: from another machine, use an SSH tunnel (README: A demo on a local server)" >&2; \
+		exit 2 ;; esac; \
 	sd=$${DEMO_SITE_DOMAIN:-$$DEMO_DOMAIN}; \
 	echo "# pacod demo: add to /etc/hosts for browsers that do not resolve *.$$DEMO_DOMAIN and *.$$sd"; \
-	if [ "$$DEMO_DOMAIN" != localhost ]; then echo "127.0.0.1 $$DEMO_DOMAIN"; fi; \
+	if [ "$$DEMO_DOMAIN" != localhost ]; then echo "$$addr $$DEMO_DOMAIN"; fi; \
 	for h in id app chat console gw $${DEMO_STUDIO_SUBDOMAIN:-studio} kb bench broker broker-api agg agg-api agents grafana mail prometheus; do \
-		echo "127.0.0.1 $$h.$$DEMO_DOMAIN"; done; \
+		echo "$$addr $$h.$$DEMO_DOMAIN"; done; \
 	for h in $${DEMO_CMS_SUBDOMAIN:-cms} $${DEMO_CMS_MINIMAL_SUBDOMAIN:-minimal} $${DEMO_CMS_SPACE_SUBDOMAIN:-space}; do \
-		echo "127.0.0.1 $$h.$$sd"; done
+		echo "$$addr $$h.$$sd"; done
